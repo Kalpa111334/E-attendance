@@ -34,3 +34,7 @@ yarn-error.log*
 *.sln
 *.sw? 
 .vercel
+
+# Docker
+.docker
+docker-compose.override.yml
