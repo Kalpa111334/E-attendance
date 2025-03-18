@@ -99,15 +99,15 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
             };
 
             const normalizedHeaders = headers.map(h => headerMappings[h] || h);
-            const requiredHeaders = ['first_name', 'last_name', 'email', 'department', 'position'];
-            
+        const requiredHeaders = ['first_name', 'last_name', 'email', 'department', 'position'];
+        
             const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
             if (missingHeaders.length > 0) {
                 throw new Error(`Missing required headers: ${missingHeaders.join(', ')}`);
             }
 
             return lines.slice(1).map((line, index) => {
-                const values = line.split(',').map(v => v.trim());
+            const values = line.split(',').map(v => v.trim());
                 
                 if (values.length !== headers.length) {
                     throw new Error(`Row ${index + 2} has incorrect number of values`);
@@ -131,8 +131,8 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                     throw new Error(`Row ${index + 2}: Department and Position are required`);
                 }
 
-                return employee;
-            });
+            return employee;
+        });
         } catch (error) {
             if (error instanceof Error) {
                 throw new Error(`CSV parsing error: ${error.message}`);
@@ -253,8 +253,8 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                                 fontWeight: 700,
                             }}
                         >
-                            Bulk QR Code Generator
-                        </Typography>
+                        Bulk QR Code Generator
+                    </Typography>
 
                         <Alert 
                             severity="info" 
@@ -272,7 +272,7 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                                 <Box>
                                     <Typography variant="subtitle2" gutterBottom>
                                         CSV Format Example:
-                                    </Typography>
+                    </Typography>
                                     <Box component="pre" sx={{ 
                                         bgcolor: 'background.paper',
                                         p: 1,
@@ -306,62 +306,62 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                             </Stack>
                         </Alert>
 
-                        {error && (
+                    {error && (
                             <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                                {error}
-                            </Alert>
-                        )}
+                            {error}
+                        </Alert>
+                    )}
 
-                        <TextField
-                            multiline
-                            rows={10}
-                            fullWidth
-                            placeholder="Paste your CSV content here..."
-                            value={csvContent}
-                            onChange={(e) => setCsvContent(e.target.value)}
-                            variant="outlined"
-                            sx={{ mb: 2 }}
-                        />
+                    <TextField
+                        multiline
+                        rows={10}
+                        fullWidth
+                        placeholder="Paste your CSV content here..."
+                        value={csvContent}
+                        onChange={(e) => setCsvContent(e.target.value)}
+                        variant="outlined"
+                        sx={{ mb: 2 }}
+                    />
 
-                        <Button
-                            variant="contained"
-                            onClick={handleSubmit}
-                            disabled={loading || !csvContent.trim()}
-                            startIcon={loading ? <CircularProgress size={20} /> : <UploadIcon />}
+                    <Button
+                        variant="contained"
+                        onClick={handleSubmit}
+                        disabled={loading || !csvContent.trim()}
+                        startIcon={loading ? <CircularProgress size={20} /> : <UploadIcon />}
                             sx={{
                                 background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                                 '&:hover': {
                                     background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`,
                                 }
                             }}
-                        >
-                            {loading ? 'Processing...' : 'Generate QR Codes'}
-                        </Button>
+                    >
+                        {loading ? 'Processing...' : 'Generate QR Codes'}
+                    </Button>
 
-                        {results.length > 0 && (
-                            <Paper sx={{ mt: 3, p: 2 }}>
-                                <Typography variant="h6" gutterBottom>
+                    {results.length > 0 && (
+                        <Paper sx={{ mt: 3, p: 2 }}>
+                            <Typography variant="h6" gutterBottom>
                                     Results ({results.filter(r => r.success).length} successful, {results.filter(r => !r.success).length} failed)
-                                </Typography>
-                                <List>
-                                    {results.map((result, index) => (
-                                        <ListItem key={index}>
-                                            <ListItemIcon>
-                                                {result.success ? (
-                                                    <SuccessIcon color="success" />
-                                                ) : (
-                                                    <ErrorIcon color="error" />
-                                                )}
-                                            </ListItemIcon>
+                            </Typography>
+                            <List>
+                                {results.map((result, index) => (
+                                    <ListItem key={index}>
+                                        <ListItemIcon>
+                                            {result.success ? (
+                                                <SuccessIcon color="success" />
+                                            ) : (
+                                                <ErrorIcon color="error" />
+                                            )}
+                                        </ListItemIcon>
                                             <ListItemText 
                                                 primary={result.message}
                                                 secondary={result.error}
                                             />
-                                        </ListItem>
-                                    ))}
-                                </List>
-                            </Paper>
-                        )}
+                                    </ListItem>
+                                ))}
+                            </List>
+                        </Paper>
+                    )}
 
                         <Box sx={{ 
                             mt: 4, 
@@ -391,8 +391,8 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                                 POWERED BY: MIDIZ
                             </Typography>
                         </Box>
-                    </CardContent>
-                </Card>
+                </CardContent>
+            </Card>
             </Fade>
         </Box>
     );

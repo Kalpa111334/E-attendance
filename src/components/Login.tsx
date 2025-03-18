@@ -127,10 +127,10 @@ const Login: React.FC = () => {
                                 </Typography>
                                 <Typography color="text.secondary" textAlign="center">
                                     Sign in to access your dashboard
-                                </Typography>
+                        </Typography>
                             </Box>
 
-                            {error && (
+                        {error && (
                                 <Alert
                                     severity="error"
                                     sx={{
@@ -139,22 +139,22 @@ const Login: React.FC = () => {
                                         boxShadow: `0 4px 12px ${alpha(theme.palette.error.main, 0.1)}`,
                                     }}
                                 >
-                                    {error}
-                                </Alert>
-                            )}
+                                {error}
+                            </Alert>
+                        )}
 
                             <Box component="form" onSubmit={handleSubmit}>
-                                <TextField
-                                    margin="normal"
-                                    required
-                                    fullWidth
-                                    id="email"
-                                    label="Email Address"
-                                    name="email"
-                                    autoComplete="email"
-                                    autoFocus
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                id="email"
+                                label="Email Address"
+                                name="email"
+                                autoComplete="email"
+                                autoFocus
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                     sx={{
                                         '& .MuiOutlinedInput-root': {
                                             borderRadius: 2,
@@ -163,18 +163,18 @@ const Login: React.FC = () => {
                                             },
                                         },
                                     }}
-                                />
-                                <TextField
-                                    margin="normal"
-                                    required
-                                    fullWidth
-                                    name="password"
-                                    label="Password"
-                                    type="password"
-                                    id="password"
-                                    autoComplete="current-password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                name="password"
+                                label="Password"
+                                type="password"
+                                id="password"
+                                autoComplete="current-password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                     sx={{
                                         '& .MuiOutlinedInput-root': {
                                             borderRadius: 2,
@@ -183,12 +183,12 @@ const Login: React.FC = () => {
                                             },
                                         },
                                     }}
-                                />
-                                <Button
-                                    type="submit"
-                                    fullWidth
-                                    variant="contained"
-                                    disabled={loading}
+                            />
+                            <Button
+                                type="submit"
+                                fullWidth
+                                variant="contained"
+                                disabled={loading}
                                     sx={{
                                         mt: 4,
                                         mb: 2,
@@ -210,13 +210,13 @@ const Login: React.FC = () => {
                                     ) : (
                                         'Sign In'
                                     )}
-                                </Button>
-                            </Box>
-                        </CardContent>
-                    </Card>
+                            </Button>
+                        </Box>
+                    </CardContent>
+                </Card>
                 </Fade>
             </Container>
-        </Box>
+            </Box>
     );
 };
 

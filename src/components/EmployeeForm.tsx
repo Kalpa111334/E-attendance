@@ -370,10 +370,10 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
-                                    name="position"
+                                        name="position"
                                     label="Position"
-                                    value={formData.position}
-                                    onChange={handleChange}
+                                        value={formData.position}
+                                        onChange={handleChange}
                                     fullWidth
                                     required
                                     sx={{
