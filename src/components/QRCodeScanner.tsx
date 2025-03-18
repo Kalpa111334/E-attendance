@@ -1,551 +1,377 @@
-import React, { useState, useEffect, useRef } from 'react';
-import 'sweetalert2/dist/sweetalert2.min.css';
+import React, { useState, useCallback } from 'react';
+import QrScanner from 'react-qr-scanner';
 import {
     Box,
-    Card,
-    CardContent,
-    Typography,
     Button,
-    Alert,
-    CircularProgress,
     Dialog,
     DialogTitle,
     DialogContent,
-    Chip,
+    IconButton,
+    Card,
+    CardContent,
+    Typography,
+    Stack,
     Grid,
     useTheme,
     alpha,
-    Stack,
-    IconButton,
-    Slide,
-    Paper,
-    Divider,
+    CircularProgress,
+    Alert,
     Fade,
-    Zoom,
-    Avatar,
-    Tooltip,
     Container,
 } from '@mui/material';
-import { Html5QrcodeScanner } from 'html5-qrcode';
-import { supabase } from '../config/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import type { Employee } from '../types/employee';
 import {
     Close as CloseIcon,
-    CheckCircle as SuccessIcon,
     CameraAlt as CameraIcon,
-    RestartAlt as RestartIcon,
-    QrCode2 as QrCodeIcon,
     Badge as BadgeIcon,
     Work as WorkIcon,
     Email as EmailIcon,
+    RestartAlt as RestartIcon,
 } from '@mui/icons-material';
 import Swal from 'sweetalert2';
-import { toast } from 'react-toastify';
+import 'sweetalert2/dist/sweetalert2.min.css';
+import { supabase } from '../config/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import type { Employee } from '../types/employee';
 
-const QRCodeScanner: React.FC = () => {
-    const [scanning, setScanning] = useState(false);
+interface QRCodeScannerProps {
+    onResult?: (result: string) => void;
+    onError?: (error: Error) => void;
+    onScanComplete?: (employee: Employee) => void;
+}
+
+const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScanComplete }) => {
+    const [scanning, setScanning] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [scannedEmployee, setScannedEmployee] = useState<Employee | null>(null);
     const [showResult, setShowResult] = useState(false);
+    const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
     const { user } = useAuth();
     const theme = useTheme();
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
-    // Add lastScannedCode to prevent duplicate scans
-    const lastScannedCode = React.useRef<string | null>(null);
-    const isProcessing = React.useRef(false);
-
-    const showSuccessAlert = async (employee: Employee) => {
-        setScanning(false); // Pause scanning
-        const result = await Swal.fire({
-            icon: 'success',
-            title: 'Employee Verified!',
-            html: `
-                <div style="margin-top: 1rem;">
-                    <h3>${employee.first_name} ${employee.last_name}</h3>
-                    <p>Employee ID: ${employee.employee_id}</p>
-                    <p>Department: ${employee.department}</p>
-                    <p>Position: ${employee.position}</p>
-                </div>
-            `,
-            showConfirmButton: true,
-            confirmButtonText: 'Scan Another',
-            confirmButtonColor: theme.palette.primary.main,
-            allowOutsideClick: false,
-            customClass: {
-                popup: 'animated fadeInDown'
-            }
-        });
-
-        if (result.isConfirmed) {
-            handleReset();
-        }
-    };
-
-    const showErrorAlert = (message: string) => {
-        Swal.fire({
-            icon: 'error',
-            title: 'Oops...',
-            text: message,
-            confirmButtonColor: theme.palette.error.main,
-            showConfirmButton: true,
-            confirmButtonText: 'Try Again',
-            customClass: {
-                popup: 'animated fadeInDown'
-            }
-        });
-    };
-
-    useEffect(() => {
-        // Initialize scanner
-        scannerRef.current = new Html5QrcodeScanner(
-            "qr-reader",
-            { fps: 10, qrbox: 250 },
-            false
-        );
-
-        scannerRef.current.render(onScanSuccess, onScanError);
-
-        // Cleanup
-        return () => {
-            if (scannerRef.current) {
-                scannerRef.current.clear();
-            }
-        };
+    const handleReset = useCallback(() => {
+        setScanning(true);
+        setScannedEmployee(null);
+        setShowResult(false);
+        setError(null);
     }, []);
 
-    const onScanSuccess = async (decodedText: string) => {
-        try {
-            setScanning(true);
-            setError(null);
-
-            // Process the QR code data
-            const employeeData = JSON.parse(decodedText);
-            
-            // Record attendance
-            const { error: attendanceError } = await supabase
-                .from('attendance')
-                .insert([
-                    {
-                        employee_id: employeeData.id,
-                        timestamp: new Date().toISOString(),
-                    },
-                ]);
-
-            if (attendanceError) throw attendanceError;
-
-            toast.success('Attendance recorded successfully!');
-        } catch (err: any) {
-            setError(err.message || 'Failed to process QR code');
-            toast.error('Failed to record attendance');
-        } finally {
-            setScanning(false);
-        }
-    };
-
-    const onScanError = (error: string) => {
-        setError(error);
-    };
-
-    const handleScan = async (result: string | null) => {
-        if (!result || loading || isProcessing.current) return;
-        if (lastScannedCode.current === result) return; // Prevent duplicate scans
+    const handleScan = useCallback(async (data: { text: string } | null) => {
+        if (!data?.text || loading) return;
 
         try {
-            lastScannedCode.current = result;
-            isProcessing.current = true;
             setLoading(true);
             setError(null);
 
-            // Show loading alert
-            Swal.fire({
-                title: 'Processing...',
-                html: 'Verifying employee details',
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+            // First verify the QR code format
+            if (!data.text.match(/^[A-Z0-9]+$/)) {
+                throw new Error('Invalid QR code format');
+            }
 
-            // Fetch employee details
             const { data: employees, error: employeeError } = await supabase
                 .from('employees')
                 .select('*')
-                .eq('employee_id', result)
-                .limit(1);
+                .eq('employee_id', data.text)
+                .single(); // Use single() to get better error handling
 
-            if (employeeError) throw employeeError;
-
-            if (!employees || employees.length === 0) {
-                throw new Error('Invalid QR code. Employee not found.');
+            if (employeeError) {
+                if (employeeError.code === 'PGRST116') {
+                    throw new Error('Employee not found');
+                }
+                throw new Error(`Database error: ${employeeError.message}`);
             }
-
-            const employee = employees[0];
 
             // Record the scan
             const { error: scanError } = await supabase
                 .from('scans')
-                .insert([{
-                    employee_id: result,
-                    scanned_by: user?.id,
-                }]);
+                .insert({
+                    employee_id: data.text,
+                    scanned_by: user?.id
+                });
 
-            if (scanError) throw scanError;
+            if (scanError) {
+                throw new Error(`Failed to record scan: ${scanError.message}`);
+            }
 
-            // Close loading alert and show success
-            Swal.close();
-            await showSuccessAlert(employee);
-            setScannedEmployee(employee);
+            setScannedEmployee(employees);
+            onResult?.(data.text);
+            onScanComplete?.(employees);
+            setShowResult(true);
+            setScanning(false);
 
-        } catch (err: any) {
-            Swal.close();
-            showErrorAlert(err.message);
-            setError(err.message);
+            await Swal.fire({
+                icon: 'success',
+                title: 'Employee Verified!',
+                html: `
+                    <div style="margin-top: 1rem;">
+                        <h3>${employees.first_name} ${employees.last_name}</h3>
+                        <p>Employee ID: ${employees.employee_id}</p>
+                        <p>Department: ${employees.department}</p>
+                        <p>Position: ${employees.position}</p>
+                    </div>
+                `,
+                showConfirmButton: true,
+                showCancelButton: true,
+                confirmButtonText: 'Scan Another',
+                cancelButtonText: 'View Details',
+                confirmButtonColor: theme.palette.primary.main,
+                cancelButtonColor: theme.palette.secondary.main,
+                allowOutsideClick: false
+            });
+
+        } catch (err) {
+            const errorMessage = err instanceof Error 
+                ? err.message 
+                : 'Failed to verify employee. Please try again.';
+            
+            setError(errorMessage);
+            onError?.(new Error(errorMessage));
+            
+            await Swal.fire({
+                icon: 'error',
+                title: 'Scan Failed',
+                text: errorMessage,
+                confirmButtonColor: theme.palette.error.main,
+                confirmButtonText: 'Try Again'
+            });
+            
+            handleReset();
         } finally {
             setLoading(false);
-            // Reset processing flag after delay
-            setTimeout(() => {
-                isProcessing.current = false;
-            }, 1000);
         }
-    };
+    }, [loading, onResult, onScanComplete, onError, user, theme, handleReset]);
 
-    const handleError = (err: Error) => {
-        showErrorAlert('Failed to access camera: ' + err.message);
-        setError('Failed to access camera: ' + err.message);
-    };
+    const handleError = useCallback((err: Error) => {
+        setError(err.message);
+        onError?.(err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Camera Error',
+            text: err.message,
+            confirmButtonColor: theme.palette.error.main
+        });
+    }, [onError, theme]);
 
-    const handleReset = () => {
-        setScanning(false);
-        setError(null);
-        setScannedEmployee(null);
-        setShowResult(false);
-        isProcessing.current = false;
-        lastScannedCode.current = null; // Reset last scanned code
-    };
-
-    // Add some custom styles
-    useEffect(() => {
-        // Add custom styles for animations
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .animated {
-                animation-duration: 0.3s;
-                animation-fill-mode: both;
-            }
-            
-            @keyframes fadeInDown {
-                from {
-                    opacity: 0;
-                    transform: translate3d(0, -20px, 0);
-                }
-                to {
-                    opacity: 1;
-                    transform: translate3d(0, 0, 0);
-                }
-            }
-            
-            .fadeInDown {
-                animation-name: fadeInDown;
-            }
-            
-            .swal2-popup {
-                border-radius: 15px !important;
-                padding: 2rem !important;
-            }
-            
-            .swal2-title {
-                color: ${theme.palette.text.primary} !important;
-            }
-            
-            .swal2-html-container {
-                color: ${theme.palette.text.secondary} !important;
-            }
-        `;
-        document.head.appendChild(style);
-
-        return () => {
-            document.head.removeChild(style);
-        };
-    }, [theme]);
+    const toggleCamera = useCallback(() => {
+        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+    }, []);
 
     return (
-        <Container maxWidth="sm">
-            <Paper
-                elevation={0}
-                sx={{
-                    p: 4,
-                    mt: 4,
-                    borderRadius: 2,
-                    background: theme => `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${alpha(theme.palette.secondary.light, 0.1)} 100%)`,
-                }}
-            >
-                <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 700 }}>
-                    QR Code Scanner
-                </Typography>
-                
-                <Box sx={{ mt: 4 }}>
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
-                        </Alert>
-                    )}
-                    
-                    <Box
-                        id="qr-reader"
-                        sx={{
-                            width: '100%',
-                            maxWidth: 400,
-                            margin: '0 auto',
-                            '& video': {
-                                width: '100% !important',
-                                borderRadius: 2,
-                            },
-                        }}
-                    />
+        <Container maxWidth="md">
+            <Box sx={{ 
+                p: 3, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                minHeight: '60vh',
+                position: 'relative'
+            }}>
+                            {error && (
+                                    <Alert 
+                                        severity="error"
+                        sx={{ width: '100%', mb: 2 }}
+                                        action={
+                                            <Button 
+                                color="inherit" 
+                                                size="small" 
+                                                onClick={handleReset}
+                                startIcon={<RestartIcon />}
+                            >
+                                Retry
+                                            </Button>
+                                        }
+                                    >
+                                        {error}
+                                    </Alert>
+                            )}
 
-                    {scanning && (
-                        <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mt: 2 }}>
-                            <CircularProgress size={20} />
-                            <Typography>Processing...</Typography>
+                {scanning && (
+                                <Fade in={true}>
+                                    <Box
+                                        sx={{
+                                width: '100%', 
+                                maxWidth: '600px',
+                                            position: 'relative',
+                                '& video': {
+                                    borderRadius: 2,
+                                    boxShadow: theme => `0 8px 32px ${alpha(theme.palette.primary.main, 0.1)}`
+                                },
+                                            '&::before': {
+                                                content: '""',
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                    border: '2px solid',
+                                    borderColor: 'primary.main',
+                                                borderRadius: 2,
+                                    animation: 'pulse 2s infinite'
+                                },
+                                '&::after': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: '50%',
+                                    left: 0,
+                                    right: 0,
+                                    height: '2px',
+                                    backgroundColor: theme => alpha(theme.palette.primary.main, 0.8),
+                                    animation: 'scan 2s linear infinite'
+                                },
+                                '@keyframes pulse': {
+                                                '0%': {
+                                        opacity: 1,
+                                        transform: 'scale(1)'
+                                                },
+                                                '50%': {
+                                        opacity: 0.5,
+                                        transform: 'scale(1.02)'
+                                                },
+                                                '100%': {
+                                        opacity: 1,
+                                        transform: 'scale(1)'
+                                    }
+                                },
+                                '@keyframes scan': {
+                                    '0%': {
+                                        transform: 'translateY(-100px)',
+                                        opacity: 0
+                                    },
+                                    '50%': {
+                                        opacity: 1
+                                    },
+                                    '100%': {
+                                        transform: 'translateY(100px)',
+                                        opacity: 0
+                                    }
+                                }
+                            }}
+                        >
+                            <QrScanner
+                                delay={300}
+                                onError={handleError}
+                                onScan={handleScan}
+                                            constraints={{ 
+                                    video: {
+                                        facingMode,
+                                        width: { ideal: 1920 },
+                                        height: { ideal: 1080 }
+                                    }
+                                }}
+                                style={{ width: '100%' }}
+                            />
+                            {loading && (
+                                        <Box
+                                            sx={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                        bottom: 0,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: alpha('#000', 0.3),
+                                        borderRadius: 2
+                                    }}
+                                >
+                                    <CircularProgress color="primary" />
+                                    </Box>
+                            )}
+                            <Stack 
+                                direction="row" 
+                                spacing={2} 
+                                sx={{ 
+                                    mt: 2,
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <Button
+                                    variant="contained"
+                                    startIcon={<CameraIcon />}
+                                    onClick={toggleCamera}
+                                    disabled={loading}
+                                    sx={{
+                                        borderRadius: 2,
+                                        transition: 'all 0.2s',
+                                        '&:hover': {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: theme => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`,
+                                        }
+                                    }}
+                                >
+                                    Switch Camera
+                                </Button>
                         </Stack>
-                    )}
-                </Box>
-            </Paper>
+                        </Box>
+            </Fade>
+                )}
 
             <Dialog
-                open={showResult}
+                    open={showResult && !!scannedEmployee}
                 onClose={handleReset}
                 maxWidth="sm"
                 fullWidth
-                TransitionComponent={Slide}
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)}, ${alpha(theme.palette.background.paper, 0.95)})`,
-                        backdropFilter: 'blur(10px)',
-                    }
-                }}
-            >
-                <DialogTitle 
-                    sx={{ 
-                        p: 3, 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1,
-                        background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)}, ${alpha(theme.palette.success.main, 0.05)})`,
-                    }}
+                    TransitionComponent={Fade}
                 >
-                    <SuccessIcon color="success" />
-                    <Typography 
-                        variant="h6" 
-                        component="span" 
-                        sx={{ 
-                            flexGrow: 1,
-                            fontWeight: 600,
-                        }}
-                    >
-                        Employee Verified
-                    </Typography>
+                    <DialogTitle sx={{ pr: 6 }}>
+                        Employee Details
                     <IconButton 
                         onClick={handleReset} 
-                        size="small"
                         sx={{
+                                position: 'absolute', 
+                                right: 8, 
+                                top: 8,
+                                transition: 'all 0.2s',
                             '&:hover': {
-                                transform: 'rotate(90deg)',
-                            },
-                            transition: 'transform 0.3s',
+                                    transform: 'rotate(90deg)'
+                                }
                         }}
                     >
                         <CloseIcon />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers>
+                    <DialogContent>
                     {scannedEmployee && (
+                            <Card elevation={0} sx={{ bgcolor: 'background.default' }}>
+                                <CardContent>
                         <Stack spacing={3}>
-                            <Zoom in={true}>
-                                <Box sx={{ textAlign: 'center', py: 2 }}>
-                                    <Box
-                                        sx={{
-                                            width: 80,
-                                            height: 80,
-                                            borderRadius: '50%',
-                                            bgcolor: alpha(theme.palette.success.main, 0.1),
-                                            color: theme.palette.success.main,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            mx: 'auto',
-                                            mb: 2,
-                                            animation: 'success-pulse 2s infinite',
-                                            '@keyframes success-pulse': {
-                                                '0%': {
-                                                    transform: 'scale(1)',
-                                                    boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0.4)}`,
-                                                },
-                                                '70%': {
-                                                    transform: 'scale(1.1)',
-                                                    boxShadow: `0 0 0 10px ${alpha(theme.palette.success.main, 0)}`,
-                                                },
-                                                '100%': {
-                                                    transform: 'scale(1)',
-                                                    boxShadow: `0 0 0 0 ${alpha(theme.palette.success.main, 0)}`,
-                                                },
-                                            },
-                                        }}
-                                    >
-                                        <SuccessIcon sx={{ fontSize: 40 }} />
-                                    </Box>
-                                    <Typography 
-                                        variant="h5"
-                                        sx={{
-                                            fontWeight: 600,
-                                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                            WebkitBackgroundClip: 'text',
-                                            WebkitTextFillColor: 'transparent',
-                                        }}
-                                    >
+                                        <Typography variant="h5" gutterBottom>
                                         {scannedEmployee.first_name} {scannedEmployee.last_name}
                                     </Typography>
-                                    <Typography color="textSecondary" sx={{ mt: 1 }}>
-                                        Employee ID: {scannedEmployee.employee_id}
-                                    </Typography>
-                                </Box>
-                            </Zoom>
-
                             <Grid container spacing={2}>
-                                <Grid item xs={12} sm={6}>
-                                    <Fade in={true} style={{ transitionDelay: '100ms' }}>
-                                        <Paper 
-                                            sx={{ 
-                                                p: 2, 
-                                                bgcolor: alpha(theme.palette.primary.main, 0.05),
-                                                transition: 'transform 0.2s',
-                                                '&:hover': {
-                                                    transform: 'translateY(-2px)',
-                                                },
-                                            }}
-                                        >
-                                            <Stack direction="row" alignItems="center" spacing={2}>
-                                                <Avatar
-                                                    sx={{
-                                                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                                        color: theme.palette.primary.main,
-                                                    }}
-                                                >
-                                                    <BadgeIcon />
-                                                </Avatar>
-                                                <Box sx={{ flexGrow: 1 }}>
-                                                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                                                        Department
+                                            <Grid item xs={12}>
+                                                <Stack direction="row" spacing={2} alignItems="center">
+                                                    <BadgeIcon color="primary" />
+                                                    <Typography>
+                                                        ID: {scannedEmployee.employee_id}
                                                     </Typography>
-                                                    <Chip
-                                                        label={scannedEmployee.department}
-                                                        sx={{
-                                                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                                            color: theme.palette.primary.main,
-                                                            fontWeight: 500,
-                                                        }}
-                                                    />
-                                                </Box>
                                             </Stack>
-                                        </Paper>
-                                    </Fade>
                                 </Grid>
-                                <Grid item xs={12} sm={6}>
-                                    <Fade in={true} style={{ transitionDelay: '200ms' }}>
-                                        <Paper 
-                                            sx={{ 
-                                                p: 2, 
-                                                bgcolor: alpha(theme.palette.secondary.main, 0.05),
-                                                transition: 'transform 0.2s',
-                                                '&:hover': {
-                                                    transform: 'translateY(-2px)',
-                                                },
-                                            }}
-                                        >
-                                            <Stack direction="row" alignItems="center" spacing={2}>
-                                                <Avatar
-                                                    sx={{
-                                                        bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                                                        color: theme.palette.secondary.main,
-                                                    }}
-                                                >
-                                                    <WorkIcon />
-                                                </Avatar>
-                                                <Box sx={{ flexGrow: 1 }}>
-                                                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                                                        Position
+                                            <Grid item xs={12}>
+                                                <Stack direction="row" spacing={2} alignItems="center">
+                                                    <WorkIcon color="primary" />
+                                                    <Typography>
+                                                        Department: {scannedEmployee.department}
                                                     </Typography>
-                                                    <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                                                        {scannedEmployee.position}
-                                                    </Typography>
-                                                </Box>
                                             </Stack>
-                                        </Paper>
-                                    </Fade>
                                 </Grid>
                                 <Grid item xs={12}>
-                                    <Fade in={true} style={{ transitionDelay: '300ms' }}>
-                                        <Paper 
-                                            sx={{ 
-                                                p: 2, 
-                                                bgcolor: alpha(theme.palette.info.main, 0.05),
-                                                transition: 'transform 0.2s',
-                                                '&:hover': {
-                                                    transform: 'translateY(-2px)',
-                                                },
-                                            }}
-                                        >
-                                            <Stack direction="row" alignItems="center" spacing={2}>
-                                                <Avatar
-                                                    sx={{
-                                                        bgcolor: alpha(theme.palette.info.main, 0.1),
-                                                        color: theme.palette.info.main,
-                                                    }}
-                                                >
-                                                    <EmailIcon />
-                                                </Avatar>
-                                                <Box sx={{ flexGrow: 1 }}>
-                                                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                                                        Email
+                                                <Stack direction="row" spacing={2} alignItems="center">
+                                                    <EmailIcon color="primary" />
+                                                    <Typography>
+                                                        Position: {scannedEmployee.position}
                                                     </Typography>
-                                                    <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
-                                                        {scannedEmployee.email}
-                                                    </Typography>
-                                                </Box>
                                             </Stack>
-                                        </Paper>
-                                    </Fade>
                                 </Grid>
                             </Grid>
-
-                            <Fade in={true} style={{ transitionDelay: '400ms' }}>
-                                <Button
-                                    variant="contained"
-                                    startIcon={<RestartIcon />}
-                                    onClick={handleReset}
-                                    fullWidth
-                                    size="large"
-                                    sx={{
-                                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-                                        transition: 'transform 0.2s',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                        },
-                                    }}
-                                >
-                                    Scan Another QR Code
-                                </Button>
-                            </Fade>
                         </Stack>
+                                </CardContent>
+                            </Card>
                     )}
                 </DialogContent>
             </Dialog>
+        </Box>
         </Container>
     );
 };
