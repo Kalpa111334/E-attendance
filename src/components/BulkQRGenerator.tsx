@@ -134,7 +134,10 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                 return employee;
             });
         } catch (error) {
-            throw new Error(`CSV parsing error: ${error.message}`);
+            if (error instanceof Error) {
+                throw new Error(`CSV parsing error: ${error.message}`);
+            }
+            throw new Error('An unknown error occurred while parsing the CSV');
         }
     }, []);
 
@@ -158,7 +161,7 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                         created_at: new Date().toISOString()
                     };
 
-                    const { data, error: insertError } = await supabase
+                    const { error: insertError } = await supabase
                         .from('employees')
                         .insert([fullEmployeeData])
                         .select()
@@ -196,7 +199,7 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
                         success: false,
                         employee_id: '',
                         message: `Failed: ${employeeData.first_name} ${employeeData.last_name}`,
-                        error: err.message
+                        error: err instanceof Error ? err.message : 'An unknown error occurred'
                     });
                 }
             }
@@ -212,8 +215,9 @@ Jane,Smith,jane@example.com,Marketing,Manager`;
             }
 
         } catch (err) {
-            setError(err.message);
-            toast.error(err.message);
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
