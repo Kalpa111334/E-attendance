@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import {
     Box,
@@ -24,8 +24,9 @@ import {
     Zoom,
     Avatar,
     Tooltip,
+    Container,
 } from '@mui/material';
-import { QrReader } from 'react-qr-reader';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Employee } from '../types/employee';
@@ -40,15 +41,17 @@ import {
     Email as EmailIcon,
 } from '@mui/icons-material';
 import Swal from 'sweetalert2';
+import { toast } from 'react-toastify';
 
 const QRCodeScanner: React.FC = () => {
-    const [scanning, setScanning] = useState(true);
+    const [scanning, setScanning] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [scannedEmployee, setScannedEmployee] = useState<Employee | null>(null);
     const [showResult, setShowResult] = useState(false);
     const { user } = useAuth();
     const theme = useTheme();
+    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
     // Add lastScannedCode to prevent duplicate scans
     const lastScannedCode = React.useRef<string | null>(null);
@@ -93,6 +96,57 @@ const QRCodeScanner: React.FC = () => {
                 popup: 'animated fadeInDown'
             }
         });
+    };
+
+    useEffect(() => {
+        // Initialize scanner
+        scannerRef.current = new Html5QrcodeScanner(
+            "qr-reader",
+            { fps: 10, qrbox: 250 },
+            false
+        );
+
+        scannerRef.current.render(onScanSuccess, onScanError);
+
+        // Cleanup
+        return () => {
+            if (scannerRef.current) {
+                scannerRef.current.clear();
+            }
+        };
+    }, []);
+
+    const onScanSuccess = async (decodedText: string) => {
+        try {
+            setScanning(true);
+            setError(null);
+
+            // Process the QR code data
+            const employeeData = JSON.parse(decodedText);
+            
+            // Record attendance
+            const { error: attendanceError } = await supabase
+                .from('attendance')
+                .insert([
+                    {
+                        employee_id: employeeData.id,
+                        timestamp: new Date().toISOString(),
+                    },
+                ]);
+
+            if (attendanceError) throw attendanceError;
+
+            toast.success('Attendance recorded successfully!');
+        } catch (err: any) {
+            setError(err.message || 'Failed to process QR code');
+            toast.error('Failed to record attendance');
+        } finally {
+            setScanning(false);
+        }
+    };
+
+    const onScanError = (error: string) => {
+        setError(error);
     };
 
     const handleScan = async (result: string | null) => {
@@ -165,7 +219,7 @@ const QRCodeScanner: React.FC = () => {
     };
 
     const handleReset = () => {
-        setScanning(true);
+        setScanning(false);
         setError(null);
         setScannedEmployee(null);
         setShowResult(false);
@@ -219,219 +273,48 @@ const QRCodeScanner: React.FC = () => {
     }, [theme]);
 
     return (
-        <Box sx={{ py: 4 }}>
-            <Fade in={true}>
-                <Card
-                    sx={{
-                        position: 'relative',
-                        overflow: 'visible',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: -10,
-                            left: -10,
-                            right: -10,
-                            bottom: -10,
-                            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-                            borderRadius: '20px',
-                            zIndex: -1,
-                            animation: 'pulse 2s infinite',
-                        },
-                        '@keyframes pulse': {
-                            '0%': {
-                                transform: 'scale(1)',
-                                opacity: 0.8,
+        <Container maxWidth="sm">
+            <Paper
+                elevation={0}
+                sx={{
+                    p: 4,
+                    mt: 4,
+                    borderRadius: 2,
+                    background: theme => `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${alpha(theme.palette.secondary.light, 0.1)} 100%)`,
+                }}
+            >
+                <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 700 }}>
+                    QR Code Scanner
+                </Typography>
+                
+                <Box sx={{ mt: 4 }}>
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
+                    
+                    <Box
+                        id="qr-reader"
+                        sx={{
+                            width: '100%',
+                            maxWidth: 400,
+                            margin: '0 auto',
+                            '& video': {
+                                width: '100% !important',
+                                borderRadius: 2,
                             },
-                            '50%': {
-                                transform: 'scale(1.02)',
-                                opacity: 0.6,
-                            },
-                            '100%': {
-                                transform: 'scale(1)',
-                                opacity: 0.8,
-                            },
-                        },
-                    }}
-                >
-                    <CardContent>
-                        <Stack spacing={3}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <Avatar
-                                    sx={{
-                                        width: 64,
-                                        height: 64,
-                                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                        color: theme.palette.primary.main,
-                                        mx: 'auto',
-                                        mb: 2,
-                                    }}
-                                >
-                                    <QrCodeIcon sx={{ fontSize: 36 }} />
-                                </Avatar>
-                                <Typography 
-                                    variant="h5" 
-                                    gutterBottom
-                                    sx={{
-                                        fontWeight: 600,
-                                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                        WebkitBackgroundClip: 'text',
-                                        WebkitTextFillColor: 'transparent',
-                                    }}
-                                >
-                                    QR Code Scanner
-                                </Typography>
-                                <Typography color="textSecondary">
-                                    Position the QR code within the frame to scan
-                                </Typography>
-                            </Box>
+                        }}
+                    />
 
-                            {error && (
-                                <Zoom in={true}>
-                                    <Alert 
-                                        severity="error"
-                                        sx={{ 
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            borderRadius: 2,
-                                            boxShadow: `0 4px 12px ${alpha(theme.palette.error.main, 0.2)}`,
-                                        }}
-                                        action={
-                                            <Button 
-                                                color="error" 
-                                                size="small" 
-                                                onClick={handleReset}
-                                                sx={{
-                                                    '&:hover': {
-                                                        transform: 'translateY(-1px)',
-                                                    },
-                                                    transition: 'transform 0.2s',
-                                                }}
-                                            >
-                                                Try Again
-                                            </Button>
-                                        }
-                                    >
-                                        {error}
-                                    </Alert>
-                                </Zoom>
-                            )}
-
-                            {loading && (
-                                <Fade in={true}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-                                        <Stack spacing={2} alignItems="center">
-                                            <CircularProgress 
-                                                size={60}
-                                                sx={{
-                                                    color: theme.palette.primary.main,
-                                                    animation: 'pulse 1.5s ease-in-out infinite',
-                                                }}
-                                            />
-                                            <Typography variant="body2" color="textSecondary">
-                                                Processing QR Code...
-                                            </Typography>
-                                        </Stack>
-                                    </Box>
-                                </Fade>
-                            )}
-
-                            {scanning && !loading && (
-                                <Zoom in={true}>
-                                    <Box
-                                        sx={{
-                                            maxWidth: 500,
-                                            mx: 'auto',
-                                            position: 'relative',
-                                            '&::before': {
-                                                content: '""',
-                                                position: 'absolute',
-                                                top: 0,
-                                                left: 0,
-                                                right: 0,
-                                                bottom: 0,
-                                                border: `2px solid ${theme.palette.primary.main}`,
-                                                borderRadius: 2,
-                                                animation: 'scanning 2s infinite',
-                                            },
-                                            '@keyframes scanning': {
-                                                '0%': {
-                                                    borderColor: theme.palette.primary.main,
-                                                    transform: 'scale(1)',
-                                                },
-                                                '50%': {
-                                                    borderColor: theme.palette.secondary.main,
-                                                    transform: 'scale(1.02)',
-                                                },
-                                                '100%': {
-                                                    borderColor: theme.palette.primary.main,
-                                                    transform: 'scale(1)',
-                                                },
-                                            },
-                                        }}
-                                    >
-                                        <QrReader
-                                            constraints={{ 
-                                                facingMode: "environment"
-                                            }}
-                                            onResult={(result, error) => {
-                                                if (error) {
-                                                    if (error.name === 'NotAllowedError' || error.name === 'NotFoundError') {
-                                                        handleError(new Error('Please grant camera permission or check if your device has a camera'));
-                                                    }
-                                                    return;
-                                                }
-                                                if (result) {
-                                                    handleScan(result.getText());
-                                                }
-                                            }}
-                                            containerStyle={{ width: '100%' }}
-                                            videoStyle={{ 
-                                                width: '100%', 
-                                                borderRadius: '8px',
-                                                filter: 'contrast(1.1) brightness(1.1)',
-                                            }}
-                                        />
-                                        <Box
-                                            sx={{
-                                                position: 'absolute',
-                                                top: '50%',
-                                                left: '50%',
-                                                transform: 'translate(-50%, -50%)',
-                                                width: '200px',
-                                                height: '200px',
-                                                border: `2px solid ${theme.palette.success.main}`,
-                                                borderRadius: '8px',
-                                                pointerEvents: 'none',
-                                                '&::after': {
-                                                    content: '""',
-                                                    position: 'absolute',
-                                                    top: 0,
-                                                    left: 0,
-                                                    right: 0,
-                                                    height: '2px',
-                                                    background: theme.palette.success.main,
-                                                    animation: 'scan 2s linear infinite',
-                                                },
-                                                '@keyframes scan': {
-                                                    '0%': {
-                                                        transform: 'translateY(0)',
-                                                    },
-                                                    '50%': {
-                                                        transform: 'translateY(200px)',
-                                                    },
-                                                    '100%': {
-                                                        transform: 'translateY(0)',
-                                                    },
-                                                },
-                                            }}
-                                        />
-                                    </Box>
-                                </Zoom>
-                            )}
+                    {scanning && (
+                        <Stack direction="row" spacing={2} alignItems="center" justifyContent="center" sx={{ mt: 2 }}>
+                            <CircularProgress size={20} />
+                            <Typography>Processing...</Typography>
                         </Stack>
-                    </CardContent>
-                </Card>
-            </Fade>
+                    )}
+                </Box>
+            </Paper>
 
             <Dialog
                 open={showResult}
@@ -663,7 +546,7 @@ const QRCodeScanner: React.FC = () => {
                     )}
                 </DialogContent>
             </Dialog>
-        </Box>
+        </Container>
     );
 };
 
