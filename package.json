@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "homepage": ".",
+  "homepage": "https://kalpa111334.github.io/E-attendance/",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "clean": "if exist dist rmdir /s /q dist && if exist node_modules\\.cache\\gh-pages rmdir /s /q node_modules\\.cache\\gh-pages",
     "predeploy": "npm run clean && npm run build && npm run postbuild",
-    "deploy": "gh-pages -d dist --dotfiles true"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@emotion/react": "^11.11.0",
