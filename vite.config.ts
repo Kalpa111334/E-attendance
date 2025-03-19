@@ -10,9 +10,21 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       open: true,
     },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom', '@mui/material'],
+          },
+        },
+      },
+    },
     define: {
       'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
       'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
-    }
+    },
+    base: '/',
   }
 }) 
