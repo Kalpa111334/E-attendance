@@ -10,20 +10,20 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       open: true,
     },
+    define: {
+      __SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
+      __SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+    },
     build: {
       outDir: 'dist',
-      sourcemap: false,
+      sourcemap: true,
       rollupOptions: {
         output: {
           manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom', '@mui/material'],
+            vendor: ['react', 'react-dom', '@supabase/supabase-js'],
           },
         },
       },
-    },
-    define: {
-      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },
     base: '/',
   }
