@@ -71,14 +71,16 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promise<boolean> => {
     try {
         if (!isValidPhoneNumber(to)) {
-            throw new Error('Invalid phone number format');
+            throw new Error('Invalid phone number format. Please include country code (e.g., +1234567890)');
         }
 
         if (isRateLimited()) {
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        const response = await fetch('/api/send-sms', {
+        // Get the base URL from window.location
+        const baseUrl = window.location.origin;
+        const response = await fetch(`${baseUrl}/api/send-sms`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -86,8 +88,10 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
             body: JSON.stringify({ to, message }),
         });
 
+        const responseData = await response.json();
+
         if (!response.ok) {
-            throw new Error(`Failed to send SMS: ${response.statusText}`);
+            throw new Error(responseData.error || `Failed to send SMS: ${response.statusText}`);
         }
 
         messageCount++;
@@ -116,6 +120,9 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
             status: SMSStatus.FAILED,
             attempts: attempt,
             error: error instanceof Error ? error.message : 'Unknown error'
+        }).then(() => {
+            // Throw the error with a more user-friendly message
+            throw new Error(error instanceof Error ? error.message : 'Failed to send SMS. Please try again.');
         });
 
         return false;
@@ -142,8 +149,7 @@ export const sendSMSNotification = async (params: SMSNotificationParams): Promis
         }
 
         if (!recipientPhone) {
-            console.warn('No recipient phone number configured');
-            return false;
+            throw new Error('Please enter a valid phone number');
         }
 
         // Determine message template based on notification type
@@ -167,7 +173,8 @@ export const sendSMSNotification = async (params: SMSNotificationParams): Promis
         return await sendSMSWithRetry(recipientPhone, message);
     } catch (error) {
         console.error('Error in SMS notification:', error);
-        return false;
+        // Re-throw the error to be handled by the component
+        throw error;
     }
 };
 

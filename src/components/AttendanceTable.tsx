@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Paper,
     Table,
@@ -48,6 +48,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
     const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
     const [phoneNumber, setPhoneNumber] = React.useState('');
     const [loading, setLoading] = React.useState(false);
+    const [phoneError, setPhoneError] = useState<string | null>(null);
 
     const handleChangePage = (event: unknown, newPage: number) => {
         setPage(newPage);
@@ -80,28 +81,48 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
         return message;
     };
 
+    const validatePhoneNumber = (phone: string): boolean => {
+        const phoneRegex = /^\+[1-9]\d{1,14}$/;
+        return phoneRegex.test(phone);
+    };
+
+    const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setPhoneNumber(value);
+        
+        if (value && !validatePhoneNumber(value)) {
+            setPhoneError('Please enter a valid phone number with country code (e.g., +1234567890)');
+        } else {
+            setPhoneError(null);
+        }
+    };
+
     const handleShareViaSMS = async () => {
         try {
+            if (!validatePhoneNumber(phoneNumber)) {
+                setPhoneError('Please enter a valid phone number with country code (e.g., +1234567890)');
+                return;
+            }
+
             setLoading(true);
+            setPhoneError(null);
             const message = formatAttendanceRecordsForSMS(records);
             
-            const success = await sendSMSNotification({
+            await sendSMSNotification({
                 employeeName: 'Admin',
                 phoneNumber,
                 customMessage: message,
                 isAttendanceReport: true
             });
 
-            if (success) {
-                toast.success('Attendance records shared successfully');
-                setShareDialogOpen(false);
-                setPhoneNumber('');
-            } else {
-                toast.error('Failed to share attendance records');
-            }
+            toast.success('Attendance records shared successfully');
+            setShareDialogOpen(false);
+            setPhoneNumber('');
         } catch (error) {
             console.error('Error sharing attendance records:', error);
-            toast.error('Failed to share attendance records');
+            const errorMessage = error instanceof Error ? error.message : 'Failed to share attendance records';
+            setPhoneError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -249,16 +270,33 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                         type="tel"
                         fullWidth
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        onChange={handlePhoneNumberChange}
                         placeholder="+1234567890"
                         disabled={loading}
+                        error={!!phoneError}
+                        helperText={phoneError || "Include country code (e.g., +1 for USA)"}
                         sx={{ mt: 1 }}
-                        helperText="Include country code (e.g., +1 for USA)"
+                        InputProps={{
+                            sx: {
+                                '&.Mui-error': {
+                                    animation: 'shake 0.5s',
+                                    '@keyframes shake': {
+                                        '0%, 100%': { transform: 'translateX(0)' },
+                                        '25%': { transform: 'translateX(-5px)' },
+                                        '75%': { transform: 'translateX(5px)' },
+                                    },
+                                },
+                            },
+                        }}
                     />
                 </DialogContent>
                 <DialogActions sx={{ p: 2 }}>
                     <Button 
-                        onClick={() => setShareDialogOpen(false)} 
+                        onClick={() => {
+                            setShareDialogOpen(false);
+                            setPhoneError(null);
+                            setPhoneNumber('');
+                        }} 
                         disabled={loading}
                     >
                         Cancel
@@ -266,7 +304,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                     <Button
                         variant="contained"
                         onClick={handleShareViaSMS}
-                        disabled={!phoneNumber || loading}
+                        disabled={!phoneNumber || loading || !!phoneError}
                         sx={{
                             background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                         }}
