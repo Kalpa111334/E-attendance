@@ -41,7 +41,7 @@ export enum MessageStatus {
 // Notification Parameters
 interface NotificationParams {
     employeeName: string;
-    department?: string;
+    department: string;
     checkInTime?: string;
     checkOutTime?: string;
     isLate?: boolean;
@@ -185,13 +185,13 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
         if (params.isAttendanceReport && params.customMessage) {
             message = MESSAGE_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
         } else if (params.isLate && params.checkInTime) {
-            message = MESSAGE_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime, params.department || '');
+            message = MESSAGE_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime, params.department);
         } else if (params.isAbsent) {
-            message = MESSAGE_TEMPLATES.ABSENT(params.employeeName, params.department || '');
+            message = MESSAGE_TEMPLATES.ABSENT(params.employeeName, params.department);
         } else if (params.isEarlyLeave && params.checkOutTime) {
-            message = MESSAGE_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime, params.department || '');
+            message = MESSAGE_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime, params.department);
         } else if (params.overtimeHours !== undefined) {
-            message = MESSAGE_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours, params.department || '');
+            message = MESSAGE_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours, params.department);
         } else if (params.customMessage) {
             message = params.customMessage;
         } else {
