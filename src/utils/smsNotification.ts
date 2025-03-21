@@ -78,8 +78,11 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Get the base URL from window.location
-        const baseUrl = window.location.origin;
+        // Get the base URL and handle both development and production environments
+        const baseUrl = process.env.NODE_ENV === 'production' 
+            ? window.location.origin 
+            : 'http://localhost:3000';
+
         const response = await fetch(`${baseUrl}/api/send-sms`, {
             method: 'POST',
             headers: {
@@ -88,10 +91,15 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
             body: JSON.stringify({ to, message }),
         });
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to send SMS: ${response.statusText}`);
+        }
+
         const responseData = await response.json();
 
-        if (!response.ok) {
-            throw new Error(responseData.error || `Failed to send SMS: ${response.statusText}`);
+        if (!responseData.success) {
+            throw new Error(responseData.error || 'Failed to send SMS');
         }
 
         messageCount++;
@@ -108,11 +116,6 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
     } catch (error) {
         console.error(`SMS sending attempt ${attempt} failed:`, error);
 
-        if (attempt < RETRY_ATTEMPTS) {
-            await sleep(RETRY_DELAY * attempt);
-            return sendSMSWithRetry(to, message, attempt + 1);
-        }
-
         // Log failed SMS
         await supabase.from('sms_logs').insert({
             phone_number: to,
@@ -120,12 +123,14 @@ const sendSMSWithRetry = async (to: string, message: string, attempt = 1): Promi
             status: SMSStatus.FAILED,
             attempts: attempt,
             error: error instanceof Error ? error.message : 'Unknown error'
-        }).then(() => {
-            // Throw the error with a more user-friendly message
-            throw new Error(error instanceof Error ? error.message : 'Failed to send SMS. Please try again.');
         });
 
-        return false;
+        if (attempt < RETRY_ATTEMPTS) {
+            await sleep(RETRY_DELAY * attempt);
+            return sendSMSWithRetry(to, message, attempt + 1);
+        }
+
+        throw error;
     }
 };
 
