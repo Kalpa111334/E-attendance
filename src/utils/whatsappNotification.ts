@@ -161,7 +161,7 @@ const sendWhatsAppMessage = async (to: string, message: string): Promise<boolean
     }
 };
 
-// Send SMS using TextBelt API
+// Send SMS using TextLocal API
 const sendSMSMessage = async (to: string, message: string): Promise<boolean> => {
     try {
         // Remove any prefix and clean the number
@@ -175,34 +175,38 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Using TextLocal API (alternative to TextBelt)
-        const apiKey = import.meta.env.VITE_TEXTLOCAL_API_KEY || 'demo'; // Use 'demo' for testing
+        // Using TextLocal API
+        const apiKey = import.meta.env.VITE_TEXTLOCAL_API_KEY || 'demo';
         const sender = 'TXTLCL';
         
-        // Create form data
-        const formData = new FormData();
-        formData.append('apikey', apiKey);
-        formData.append('numbers', cleanNumber);
-        formData.append('message', message);
-        formData.append('sender', sender);
+        // Create URL-encoded form data
+        const params = new URLSearchParams();
+        params.append('apikey', apiKey);
+        params.append('numbers', cleanNumber);
+        params.append('message', encodeURIComponent(message));
+        params.append('sender', sender);
 
-        // Make API request with proper CORS handling
-        const response = await fetch('https://api.textlocal.in/send/', {
-            method: 'POST',
-            body: formData,
+        // Make API request
+        const response = await fetch('https://api.textlocal.in/send/?' + params.toString(), {
+            method: 'GET',
             headers: {
                 'Accept': 'application/json',
+                'Cache-Control': 'no-cache',
             },
         });
 
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('SMS API Error Response:', errorText);
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('SMS API Response:', JSON.stringify(data, null, 2));
 
         if (!data.status || data.status !== 'success') {
-            throw new Error(data.errors?.[0] || 'Failed to send SMS');
+            const errorMessage = data.errors ? JSON.stringify(data.errors) : 'Failed to send SMS';
+            throw new Error(errorMessage);
         }
 
         messageCount++;
@@ -214,12 +218,13 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             type: MessageType.SMS,
             status: MessageStatus.SENT,
             attempts: 1,
-            response: JSON.stringify(data)
+            response: JSON.stringify(data, null, 2)
         });
 
         return true;
     } catch (error) {
-        console.error('Error sending SMS message:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Error sending SMS message:', errorMessage);
 
         // Log failed message
         await supabase.from('message_logs').insert({
@@ -228,10 +233,10 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             type: MessageType.SMS,
             status: MessageStatus.FAILED,
             attempts: 1,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: errorMessage
         });
 
-        throw error;
+        throw new Error(`Failed to send SMS: ${errorMessage}`);
     }
 };
 
@@ -249,10 +254,10 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
                 .single();
 
             if (settingsError) {
-                throw new Error(`Failed to get admin ${params.messageType === MessageType.WHATSAPP ? 'WhatsApp' : 'phone'} number`);
+                throw new Error(`Failed to get admin ${params.messageType === MessageType.WHATSAPP ? 'WhatsApp' : 'phone'} number: ${settingsError.message}`);
             }
 
-            recipientContact = settings.setting_value;
+            recipientContact = settings?.setting_value;
         }
 
         if (!recipientContact) {
@@ -261,20 +266,24 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
 
         // Determine message template based on notification type
         let message: string;
-        if (params.isAttendanceReport && params.customMessage) {
-            message = MESSAGE_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
-        } else if (params.isLate && params.checkInTime) {
-            message = MESSAGE_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime, params.department || '');
-        } else if (params.isAbsent) {
-            message = MESSAGE_TEMPLATES.ABSENT(params.employeeName, params.department || '');
-        } else if (params.isEarlyLeave && params.checkOutTime) {
-            message = MESSAGE_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime, params.department || '');
-        } else if (params.overtimeHours !== undefined) {
-            message = MESSAGE_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours, params.department || '');
-        } else if (params.customMessage) {
-            message = params.customMessage;
-        } else {
-            throw new Error('Invalid notification type');
+        try {
+            if (params.isAttendanceReport && params.customMessage) {
+                message = MESSAGE_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
+            } else if (params.isLate && params.checkInTime) {
+                message = MESSAGE_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime, params.department || '');
+            } else if (params.isAbsent) {
+                message = MESSAGE_TEMPLATES.ABSENT(params.employeeName, params.department || '');
+            } else if (params.isEarlyLeave && params.checkOutTime) {
+                message = MESSAGE_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime, params.department || '');
+            } else if (params.overtimeHours !== undefined) {
+                message = MESSAGE_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours, params.department || '');
+            } else if (params.customMessage) {
+                message = params.customMessage;
+            } else {
+                throw new Error('Invalid notification type or missing required parameters');
+            }
+        } catch (error) {
+            throw new Error(`Error formatting message: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
         // Send message based on type
@@ -282,8 +291,9 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
             ? await sendWhatsAppMessage(recipientContact, message)
             : await sendSMSMessage(recipientContact, message);
     } catch (error) {
-        console.error('Error in notification:', error);
-        throw error;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error in notification service';
+        console.error('Error in notification:', errorMessage);
+        throw new Error(errorMessage);
     }
 };
 
