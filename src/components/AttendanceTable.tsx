@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { Share as ShareIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { sendSMSNotification } from '../utils/smsNotification';
+import { sendNotification } from '../utils/whatsappNotification';
 import { toast } from 'react-toastify';
 
 interface AttendanceRecord {
@@ -91,16 +91,16 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
         setPhoneNumber(value);
         
         if (value && !validatePhoneNumber(value)) {
-            setPhoneError('Please enter a valid phone number with country code (e.g., +1234567890)');
+            setPhoneError('Please enter a valid WhatsApp number with country code (e.g., +1234567890)');
         } else {
             setPhoneError(null);
         }
     };
 
-    const handleShareViaSMS = async () => {
+    const handleShareViaWhatsApp = async () => {
         try {
             if (!validatePhoneNumber(phoneNumber)) {
-                setPhoneError('Please enter a valid phone number with country code (e.g., +1234567890)');
+                setPhoneError('Please enter a valid WhatsApp number with country code (e.g., +1234567890)');
                 return;
             }
 
@@ -108,14 +108,14 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
             setPhoneError(null);
             const message = formatAttendanceRecordsForSMS(records);
             
-            await sendSMSNotification({
+            await sendNotification({
                 employeeName: 'Admin',
                 phoneNumber,
                 customMessage: message,
                 isAttendanceReport: true
             });
 
-            toast.success('Attendance records shared successfully');
+            toast.success('Attendance records shared successfully via WhatsApp');
             setShareDialogOpen(false);
             setPhoneNumber('');
         } catch (error) {
@@ -153,7 +153,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                     >
                         {title}
                     </Typography>
-                    <Tooltip title="Share via SMS">
+                    <Tooltip title="Share via WhatsApp">
                         <IconButton 
                             onClick={() => setShareDialogOpen(true)}
                             sx={{
@@ -263,10 +263,10 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                 <DialogTitle>Share Attendance Records</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Enter the phone number to send the attendance records via SMS.
+                        Enter the WhatsApp number to share the attendance records.
                     </Typography>
                     <TextField
-                        label="Phone Number"
+                        label="WhatsApp Number"
                         type="tel"
                         fullWidth
                         value={phoneNumber}
@@ -303,13 +303,13 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                     </Button>
                     <Button
                         variant="contained"
-                        onClick={handleShareViaSMS}
+                        onClick={handleShareViaWhatsApp}
                         disabled={!phoneNumber || loading || !!phoneError}
                         sx={{
                             background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                         }}
                     >
-                        {loading ? 'Sending...' : 'Send SMS'}
+                        {loading ? 'Sending...' : 'Share via WhatsApp'}
                     </Button>
                 </DialogActions>
             </Dialog>

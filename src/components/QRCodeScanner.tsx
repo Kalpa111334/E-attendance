@@ -4,7 +4,7 @@ import QrScanner from 'react-qr-scanner';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
-import { sendSMSNotification } from '../utils/smsNotification';
+import { sendNotification } from '../utils/whatsappNotification';
 import { FlipCameraIos as FlipCameraIcon } from '@mui/icons-material';
 
 interface QRCodeScannerProps {
@@ -38,65 +38,121 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             setLoading(true);
             setError(null);
 
-            // Get employee details
+            // Verify employee
             const { data: employee, error: employeeError } = await supabase
                 .from('employees')
-                .select('*')
+                .select('*, departments(name)')
                 .eq('employee_id', data.text)
                 .single();
 
-            if (employeeError) {
-                throw new Error(`Employee not found: ${employeeError.message}`);
+            if (employeeError || !employee) {
+                throw new Error('Invalid QR code or employee not found');
             }
 
-            const today = format(new Date(), 'yyyy-MM-dd');
+            // Record the scan
+            const { data: scan, error: scanError } = await supabase
+                .from('scans')
+                .insert({
+                    employee_id: employee.employee_id,
+                    scanned_by: user?.id
+                })
+                .select()
+                .single();
 
-            // Get working hours record
+            if (scanError) {
+                throw new Error('Failed to record scan');
+            }
+
+            // Get or create working hours record for today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
             const { data: hoursRecord, error: hoursError } = await supabase
                 .from('working_hours')
                 .select('*')
-                .eq('employee_id', data.text)
-                .eq('date', today)
+                .eq('employee_id', employee.employee_id)
+                .gte('date', today.toISOString())
+                .lt('date', new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString())
                 .single();
 
-            if (hoursError && hoursError.code !== 'PGRST116') {
-                throw new Error(`Failed to get working hours: ${hoursError.message}`);
+            if (hoursError && hoursError.code !== 'PGRST116') { // PGRST116 means no rows returned
+                throw new Error('Failed to check working hours');
             }
 
-            // If this is a late check-in, send SMS notification
-            if (hoursRecord?.is_late) {
-                const checkInTime = format(new Date(hoursRecord.check_in), 'hh:mm a');
-                await sendSMSNotification({
-                    employeeName: `${employee.first_name} ${employee.last_name}`,
-                    checkInTime,
-                    isLate: true
-                });
-            }
+            let updatedHoursRecord;
+            if (!hoursRecord) {
+                // First scan of the day - check in
+                const { data: newRecord, error: createError } = await supabase
+                    .from('working_hours')
+                    .insert({
+                        employee_id: employee.employee_id,
+                        check_in: new Date().toISOString(),
+                        date: today.toISOString()
+                    })
+                    .select()
+                    .single();
 
-            // If employee hasn't checked in by a certain time, send absent notification
-            const currentHour = new Date().getHours();
-            if (!hoursRecord && currentHour >= 11) { // 11 AM threshold
-                await sendSMSNotification({
-                    employeeName: `${employee.first_name} ${employee.last_name}`,
-                    isAbsent: true
-                });
-            }
-
-            // If employee is leaving early, send notification
-            if (hoursRecord?.check_out) {
-                const checkOutTime = new Date(hoursRecord.check_out);
-                const workEndHour = 17; // 5 PM
-                if (checkOutTime.getHours() < workEndHour) {
-                    await sendSMSNotification({
-                        employeeName: `${employee.first_name} ${employee.last_name}`,
-                        checkOutTime: format(checkOutTime, 'hh:mm a'),
-                        isEarlyLeave: true
-                    });
+                if (createError) {
+                    throw new Error('Failed to create working hours record');
                 }
+                updatedHoursRecord = newRecord;
+
+                // Check if this is a late check-in
+                const { data: settings } = await supabase
+                    .from('company_settings')
+                    .select('setting_value')
+                    .in('setting_key', ['work_start_time', 'late_threshold_minutes'])
+                    .order('setting_key');
+
+                if (settings && settings.length === 2) {
+                    const workStartTime = settings[0].setting_value; // Format: "HH:mm"
+                    const lateThreshold = parseInt(settings[1].setting_value);
+
+                    const [startHour, startMinute] = workStartTime.split(':').map(Number);
+                    const startTimeToday = new Date(today);
+                    startTimeToday.setHours(startHour, startMinute + lateThreshold);
+
+                    if (new Date() > startTimeToday) {
+                        // Employee is late
+                        const { data: updateData, error: updateError } = await supabase
+                            .from('working_hours')
+                            .update({ is_late: true })
+                            .eq('id', newRecord.id)
+                            .select()
+                            .single();
+
+                        if (!updateError) {
+                            updatedHoursRecord = updateData;
+                        }
+
+                        // Send WhatsApp notification
+                        await sendNotification({
+                            employeeName: `${employee.first_name} ${employee.last_name}`,
+                            department: employee.departments.name,
+                            checkInTime: format(new Date(), 'hh:mm a'),
+                            isLate: true
+                        });
+                    }
+                }
+            } else {
+                // Subsequent scan - check out
+                const { data: updateData, error: updateError } = await supabase
+                    .from('working_hours')
+                    .update({
+                        check_out: new Date().toISOString()
+                    })
+                    .eq('id', hoursRecord.id)
+                    .select()
+                    .single();
+
+                if (updateError) {
+                    throw new Error('Failed to update working hours record');
+                }
+                updatedHoursRecord = updateData;
             }
 
             setScannedEmployee(employee);
-            setWorkingHours(hoursRecord);
+            setWorkingHours(updatedHoursRecord);
             onResult?.(data.text);
             onScanComplete?.(employee);
             setShowResult(true);
@@ -128,93 +184,78 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     };
 
     return (
-        <Box sx={{ position: 'relative', width: '100%', maxWidth: 500, mx: 'auto' }}>
+        <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
             {scanning ? (
                 <Paper
                     elevation={0}
                     sx={{
                         p: 2,
                         borderRadius: 4,
-                        overflow: 'hidden',
-                        position: 'relative',
                         background: theme => alpha(theme.palette.background.paper, 0.8),
                         backdropFilter: 'blur(10px)',
                         border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                            animation: 'pulse 2s infinite',
-                        '@keyframes pulse': {
-                            '0%': {
-                                boxShadow: theme => `0 0 0 0 ${alpha(theme.palette.primary.main, 0.4)}`
-                            },
-                            '70%': {
-                                boxShadow: theme => `0 0 0 10px ${alpha(theme.palette.primary.main, 0)}`
-                            },
-                            '100%': {
-                                boxShadow: theme => `0 0 0 0 ${alpha(theme.palette.primary.main, 0)}`
-                            }
-                        }
+                        position: 'relative',
+                        overflow: 'hidden'
                     }}
                 >
-                    <QrScanner
-                        onError={handleError}
-                        onScan={handleScan}
-                        style={{ width: '100%' }}
-                        constraints={{
-                            video: {
-                                facingMode: facingMode
-                            }
-                        }}
-                    />
-                    <Tooltip title="Switch Camera">
-                        <IconButton
-                            onClick={handleSwitchCamera}
-                                        sx={{
-                                                position: 'absolute',
-                                top: 16,
-                                right: 16,
-                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.8),
-                                backdropFilter: 'blur(4px)',
-                                '&:hover': {
-                                    backgroundColor: theme => alpha(theme.palette.background.paper, 0.9),
+                    <Box sx={{ position: 'relative' }}>
+                        <QrScanner
+                            delay={1000}
+                            style={{ width: '100%' }}
+                            onError={handleError}
+                            onScan={handleScan}
+                            facingMode={facingMode}
+                        />
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: '2px',
+                                background: theme => `linear-gradient(90deg, 
+                                    ${alpha(theme.palette.primary.main, 0)} 0%, 
+                                    ${theme.palette.primary.main} 50%, 
+                                    ${alpha(theme.palette.primary.main, 0)} 100%)`,
+                                animation: 'scan 2s linear infinite',
+                                '@keyframes scan': {
+                                    '0%': {
+                                        transform: 'translateY(-100px)',
+                                        opacity: 0
+                                    },
+                                    '50%': {
+                                        opacity: 1
+                                    },
+                                    '100%': {
+                                        transform: 'translateY(100px)',
+                                        opacity: 0
+                                    }
                                 }
                             }}
-                        >
-                            <FlipCameraIcon />
-                        </IconButton>
-                    </Tooltip>
-                                        <Box
-                                            sx={{
-                                                position: 'absolute',
-                                                top: '50%',
-                                                    left: 0,
-                                                    right: 0,
-                                                    height: '2px',
-                            background: theme => `linear-gradient(90deg, 
-                                ${alpha(theme.palette.primary.main, 0)} 0%, 
-                                ${theme.palette.primary.main} 50%, 
-                                ${alpha(theme.palette.primary.main, 0)} 100%)`,
-                                                    animation: 'scan 2s linear infinite',
-                                                '@keyframes scan': {
-                                                    '0%': {
-                                    transform: 'translateY(-100px)',
-                                    opacity: 0
-                                                    },
-                                                    '50%': {
-                                    opacity: 1
-                                                    },
-                                                    '100%': {
-                                    transform: 'translateY(100px)',
-                                    opacity: 0
-                                }
-                            }
-                        }}
-                    />
+                        />
+                    </Box>
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                        <Tooltip title="Switch Camera">
+                            <IconButton
+                                onClick={handleSwitchCamera}
+                                sx={{
+                                    background: theme => alpha(theme.palette.primary.main, 0.1),
+                                    '&:hover': {
+                                        background: theme => alpha(theme.palette.primary.main, 0.2)
+                                    }
+                                }}
+                            >
+                                <FlipCameraIcon />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                 </Paper>
             ) : null}
 
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                     <CircularProgress />
-                                    </Box>
+                </Box>
             )}
 
             {error && (
@@ -249,7 +290,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         ID: {scannedEmployee.employee_id}
                     </Typography>
                     <Typography color="textSecondary" gutterBottom>
-                        Department: {scannedEmployee.department}
+                        Department: {scannedEmployee.departments.name}
                     </Typography>
                     
                     {workingHours && (
@@ -272,7 +313,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                                    </Typography>
+                                    </Typography>
                                 </>
                             )}
                         </>
@@ -283,4 +324,4 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     );
 };
 
-export default QRCodeScanner; 
+export default QRCodeScanner;

@@ -4,9 +4,8 @@ import twilio from 'twilio';
 const initTwilioClient = () => {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
-    const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-    if (!accountSid || !authToken || !phoneNumber) {
+    if (!accountSid || !authToken) {
         throw new Error('Missing Twilio configuration. Please check your environment variables.');
     }
 
@@ -22,7 +21,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { to, message } = req.body;
+        const { to, message, useWhatsApp } = req.body;
 
         if (!to || !message) {
             return res.status(400).json({ 
@@ -33,13 +32,21 @@ export default async function handler(req, res) {
 
         // Initialize Twilio client
         const client = initTwilioClient();
-        const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-        // Send SMS using Twilio
+        // Get the appropriate sender number based on message type
+        const from = useWhatsApp 
+            ? process.env.TWILIO_WHATSAPP_NUMBER 
+            : process.env.TWILIO_PHONE_NUMBER;
+
+        if (!from) {
+            throw new Error(`Missing ${useWhatsApp ? 'WhatsApp' : 'phone'} number configuration`);
+        }
+
+        // Send message using Twilio
         const response = await client.messages.create({
             body: message,
             to: to,
-            from: phoneNumber,
+            from: from,
         });
 
         return res.status(200).json({ 
@@ -47,7 +54,7 @@ export default async function handler(req, res) {
             messageId: response.sid 
         });
     } catch (error) {
-        console.error('Error sending SMS:', error);
+        console.error('Error sending message:', error);
 
         // Handle specific Twilio errors
         if (error.code) {
@@ -60,7 +67,7 @@ export default async function handler(req, res) {
 
         return res.status(500).json({ 
             success: false,
-            error: error.message || 'Failed to send SMS'
+            error: error.message || 'Failed to send message'
         });
     }
 } 
