@@ -32,6 +32,7 @@ import 'sweetalert2/dist/sweetalert2.min.css';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { Employee } from '../types/employee';
+import { sendSMSNotification } from '../utils/smsNotification';
 
 interface QRCodeScannerProps {
     onResult?: (result: string) => void;
@@ -46,6 +47,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [scannedEmployee, setScannedEmployee] = useState<Employee | null>(null);
     const [showResult, setShowResult] = useState(false);
     const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+    const [scanType, setScanType] = useState<'check_in' | 'check_out'>('check_in');
     const { user } = useAuth();
     const theme = useTheme();
 
@@ -68,11 +70,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 throw new Error('Invalid QR code format');
             }
 
+            // Get employee details
             const { data: employees, error: employeeError } = await supabase
                 .from('employees')
                 .select('*')
                 .eq('employee_id', data.text)
-                .single(); // Use single() to get better error handling
+                .single();
 
             if (employeeError) {
                 if (employeeError.code === 'PGRST116') {
@@ -81,16 +84,52 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 throw new Error(`Database error: ${employeeError.message}`);
             }
 
+            // Check for existing scan today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            const { data: existingScans, error: scanCheckError } = await supabase
+                .from('scans')
+                .select('scan_type, created_at')
+                .eq('employee_id', data.text)
+                .gte('created_at', today.toISOString())
+                .lt('created_at', tomorrow.toISOString())
+                .order('created_at', { ascending: false });
+
+            if (scanCheckError) {
+                throw new Error(`Error checking scans: ${scanCheckError.message}`);
+            }
+
+            // Determine scan type based on existing scans
+            const lastScan = existingScans && existingScans[0];
+            const determinedScanType = lastScan?.scan_type === 'check_in' ? 'check_out' : 'check_in';
+            setScanType(determinedScanType);
+
             // Record the scan
-            const { error: scanError } = await supabase
+            const { data: scanResult, error: scanError } = await supabase
                 .from('scans')
                 .insert({
                     employee_id: data.text,
-                    scanned_by: user?.id
-                });
+                    scanned_by: user?.id,
+                    scan_type: determinedScanType,
+                })
+                .select('*, employees(*)')
+                .single();
 
             if (scanError) {
                 throw new Error(`Failed to record scan: ${scanError.message}`);
+            }
+
+            // If this is a check-in and the employee is late, send SMS notification
+            if (determinedScanType === 'check_in' && scanResult.is_late) {
+                await sendSMSNotification({
+                    employeeId: employees.employee_id,
+                    employeeName: `${employees.first_name} ${employees.last_name}`,
+                    scanTime: new Date(scanResult.created_at),
+                    isLate: true
+                });
             }
 
             setScannedEmployee(employees);
@@ -98,6 +137,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             onScanComplete?.(employees);
             setShowResult(true);
             setScanning(false);
+
+            // Show success message with scan details
+            const scanTime = new Date(scanResult.created_at).toLocaleTimeString();
+            const scanMessage = determinedScanType === 'check_in'
+                ? `Checked in at ${scanTime}${scanResult.is_late ? ' (Late)' : ''}`
+                : `Checked out at ${scanTime}. Total working hours: ${scanResult.working_hours?.toFixed(2) || 'N/A'}`;
 
             await Swal.fire({
                 icon: 'success',
@@ -108,6 +153,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         <p>Employee ID: ${employees.employee_id}</p>
                         <p>Department: ${employees.department}</p>
                         <p>Position: ${employees.position}</p>
+                        <p style="margin-top: 1rem; font-weight: bold;">${scanMessage}</p>
                     </div>
                 `,
                 showConfirmButton: true,
