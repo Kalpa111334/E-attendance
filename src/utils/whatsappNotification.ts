@@ -83,7 +83,7 @@ const isRateLimited = (): boolean => {
 // Sleep utility function
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Send WhatsApp message using a free service
+// Send WhatsApp message using WhatsApp URL scheme
 const sendWhatsAppMessage = async (to: string, message: string): Promise<boolean> => {
     try {
         // Remove any prefix and clean the number
@@ -97,15 +97,11 @@ const sendWhatsAppMessage = async (to: string, message: string): Promise<boolean
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Using WhatsApp API URL
-        const apiUrl = `https://api.callmebot.com/whatsapp.php?phone=${cleanNumber}&text=${encodeURIComponent(message)}&apikey=123456`;
-
-        const response = await fetch(apiUrl);
-        const text = await response.text();
-
-        if (!response.ok || text.includes('ERROR')) {
-            throw new Error(text || 'Failed to send message');
-        }
+        // Create WhatsApp URL
+        const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
+        
+        // Open WhatsApp in a new window
+        window.open(whatsappUrl, '_blank');
 
         messageCount++;
         

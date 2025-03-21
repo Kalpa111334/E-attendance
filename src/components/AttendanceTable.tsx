@@ -119,7 +119,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                 isAttendanceReport: true
             });
 
-            toast.success('Attendance records shared successfully via WhatsApp');
+            toast.success('Opening WhatsApp to share attendance records...');
             setShareDialogOpen(false);
             setPhoneNumber('');
         } catch (error) {
