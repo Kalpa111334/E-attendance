@@ -20,10 +20,12 @@ import {
     DialogContent,
     DialogActions,
     TextField,
+    ToggleButton,
+    ToggleButtonGroup,
 } from '@mui/material';
-import { Share as ShareIcon } from '@mui/icons-material';
+import { Share as ShareIcon, WhatsApp as WhatsAppIcon, Sms as SmsIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { sendNotification } from '../utils/whatsappNotification';
+import { sendNotification, MessageType } from '../utils/whatsappNotification';
 import { toast } from 'react-toastify';
 
 interface AttendanceRecord {
@@ -49,6 +51,7 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
     const [phoneNumber, setPhoneNumber] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const [phoneError, setPhoneError] = useState<string | null>(null);
+    const [messageType, setMessageType] = useState<MessageType>(MessageType.WHATSAPP);
 
     const handleChangePage = (event: unknown, newPage: number) => {
         setPage(newPage);
@@ -101,10 +104,18 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
         }
     };
 
-    const handleShareViaWhatsApp = async () => {
+    const handleMessageTypeChange = (event: React.MouseEvent<HTMLElement>, newType: MessageType) => {
+        if (newType !== null) {
+            setMessageType(newType);
+            setPhoneError(null);
+            setPhoneNumber('');
+        }
+    };
+
+    const handleShare = async () => {
         try {
             if (!validatePhoneNumber(phoneNumber)) {
-                setPhoneError('Please enter a valid WhatsApp number with country code (e.g., +1234567890)');
+                setPhoneError(`Please enter a valid ${messageType === MessageType.WHATSAPP ? 'WhatsApp' : 'phone'} number with country code (e.g., +1234567890)`);
                 return;
             }
 
@@ -116,10 +127,13 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                 employeeName: 'Admin',
                 phoneNumber: phoneNumber.trim(),
                 customMessage: message,
-                isAttendanceReport: true
+                isAttendanceReport: true,
+                messageType
             });
 
-            toast.success('Opening WhatsApp to share attendance records...');
+            toast.success(messageType === MessageType.WHATSAPP 
+                ? 'Opening WhatsApp to share attendance records...'
+                : 'Sending attendance records via SMS...');
             setShareDialogOpen(false);
             setPhoneNumber('');
         } catch (error) {
@@ -258,43 +272,155 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                 onClose={() => !loading && setShareDialogOpen(false)}
                 PaperProps={{
                     sx: {
-                        borderRadius: 2,
+                        borderRadius: 3,
                         bgcolor: theme => alpha(theme.palette.background.paper, 0.9),
                         backdropFilter: 'blur(20px)',
+                        maxWidth: '450px',
+                        width: '100%',
+                        overflow: 'hidden',
+                        transition: 'transform 0.3s ease-out !important',
+                        transform: shareDialogOpen ? 'scale(1)' : 'scale(0.9)',
                     }
                 }}
             >
-                <DialogTitle>Share Attendance Records</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Enter the WhatsApp number to share the attendance records.
-                    </Typography>
-                    <TextField
-                        label="WhatsApp Number"
-                        type="tel"
-                        fullWidth
-                        value={phoneNumber}
-                        onChange={handlePhoneNumberChange}
-                        placeholder="+1234567890"
-                        disabled={loading}
-                        error={!!phoneError}
-                        helperText={phoneError || "Include country code (e.g., +1 for USA)"}
-                        sx={{ mt: 1 }}
-                        InputProps={{
-                            sx: {
-                                '&.Mui-error': {
-                                    animation: 'shake 0.5s',
-                                    '@keyframes shake': {
-                                        '0%, 100%': { transform: 'translateX(0)' },
-                                        '25%': { transform: 'translateX(-5px)' },
-                                        '75%': { transform: 'translateX(5px)' },
+                <DialogTitle sx={{ 
+                    pb: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    background: theme => `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.1)}, ${alpha(theme.palette.secondary.main, 0.1)})`,
+                }}>
+                    <ShareIcon sx={{ color: 'primary.main' }} />
+                    Share Attendance Records
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2 }}>
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Choose your preferred sharing method:
+                        </Typography>
+                        <ToggleButtonGroup
+                            value={messageType}
+                            exclusive
+                            onChange={handleMessageTypeChange}
+                            aria-label="message type"
+                            fullWidth
+                            sx={{ 
+                                mb: 2,
+                                '& .MuiToggleButton-root': {
+                                    py: 1.5,
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                    }
+                                }
+                            }}
+                        >
+                            <ToggleButton 
+                                value={MessageType.WHATSAPP}
+                                aria-label="whatsapp"
+                                sx={{
+                                    '&.Mui-selected': {
+                                        bgcolor: '#25D366 !important',
+                                        color: 'white !important',
+                                        '&:hover': {
+                                            bgcolor: '#128C7E !important',
+                                        }
+                                    }
+                                }}
+                            >
+                                <WhatsAppIcon sx={{ mr: 1 }} />
+                                WhatsApp
+                            </ToggleButton>
+                            <ToggleButton 
+                                value={MessageType.SMS}
+                                aria-label="sms"
+                                sx={{
+                                    '&.Mui-selected': {
+                                        bgcolor: theme => `${theme.palette.primary.main} !important`,
+                                        color: 'white !important',
+                                        '&:hover': {
+                                            bgcolor: theme => `${theme.palette.primary.dark} !important`,
+                                        }
+                                    }
+                                }}
+                            >
+                                <SmsIcon sx={{ mr: 1 }} />
+                                SMS
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+                    </Box>
+                    <Box sx={{ 
+                        p: 2, 
+                        borderRadius: 2,
+                        bgcolor: theme => alpha(theme.palette.background.default, 0.5),
+                        border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    }}>
+                        <TextField
+                            label={messageType === MessageType.WHATSAPP ? "WhatsApp Number" : "Phone Number"}
+                            type="tel"
+                            fullWidth
+                            value={phoneNumber}
+                            onChange={handlePhoneNumberChange}
+                            placeholder="+1234567890"
+                            disabled={loading}
+                            error={!!phoneError}
+                            helperText={phoneError || `Enter ${messageType === MessageType.WHATSAPP ? 'WhatsApp' : 'phone'} number with country code`}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    bgcolor: 'background.paper',
+                                    transition: 'transform 0.2s ease',
+                                    '&:hover': {
+                                        transform: 'translateY(-1px)',
+                                    }
+                                }
+                            }}
+                            InputProps={{
+                                startAdornment: (
+                                    <Box 
+                                        component="span" 
+                                        sx={{ 
+                                            mr: 1,
+                                            color: messageType === MessageType.WHATSAPP ? '#25D366' : 'primary.main'
+                                        }}
+                                    >
+                                        {messageType === MessageType.WHATSAPP ? <WhatsAppIcon /> : <SmsIcon />}
+                                    </Box>
+                                ),
+                                sx: {
+                                    '&.Mui-error': {
+                                        animation: 'shake 0.5s',
+                                        '@keyframes shake': {
+                                            '0%, 100%': { transform: 'translateX(0)' },
+                                            '25%': { transform: 'translateX(-5px)' },
+                                            '75%': { transform: 'translateX(5px)' },
+                                        },
                                     },
                                 },
-                            },
-                        }}
-                    />
+                            }}
+                        />
+                        {messageType === MessageType.SMS && (
+                            <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                    mt: 2, 
+                                    color: 'warning.main',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5
+                                }}
+                            >
+                                ℹ️ Free SMS service is limited to 1 message per day
+                            </Typography>
+                        )}
+                    </Box>
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
+                <DialogActions 
+                    sx={{ 
+                        p: 2,
+                        gap: 1,
+                        bgcolor: theme => alpha(theme.palette.background.default, 0.3),
+                    }}
+                >
                     <Button 
                         onClick={() => {
                             setShareDialogOpen(false);
@@ -302,18 +428,53 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                             setPhoneNumber('');
                         }} 
                         disabled={loading}
+                        sx={{
+                            borderRadius: 2,
+                            px: 3,
+                        }}
                     >
                         Cancel
                     </Button>
                     <Button
                         variant="contained"
-                        onClick={handleShareViaWhatsApp}
+                        onClick={handleShare}
                         disabled={!phoneNumber || loading || !!phoneError}
+                        startIcon={messageType === MessageType.WHATSAPP ? <WhatsAppIcon /> : <SmsIcon />}
                         sx={{
-                            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            borderRadius: 2,
+                            px: 3,
+                            background: theme => messageType === MessageType.WHATSAPP
+                                ? `linear-gradient(45deg, #25D366, #128C7E)`
+                                : `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            '&:not(:disabled):hover': {
+                                transform: 'translateY(-2px)',
+                                boxShadow: theme => `0 4px 12px ${alpha(
+                                    messageType === MessageType.WHATSAPP ? '#25D366' : theme.palette.primary.main, 
+                                    0.3
+                                )}`,
+                            },
+                            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
                         }}
                     >
-                        {loading ? 'Sending...' : 'Share via WhatsApp'}
+                        {loading ? (
+                            <>
+                                <Box 
+                                    component="span" 
+                                    sx={{ 
+                                        display: 'inline-block',
+                                        animation: 'pulse 1.5s ease-in-out infinite',
+                                        '@keyframes pulse': {
+                                            '0%, 100%': { opacity: 1 },
+                                            '50%': { opacity: 0.5 },
+                                        },
+                                    }}
+                                >
+                                    Sending...
+                                </Box>
+                            </>
+                        ) : (
+                            `Share via ${messageType === MessageType.WHATSAPP ? 'WhatsApp' : 'SMS'}`
+                        )}
                     </Button>
                 </DialogActions>
             </Dialog>
