@@ -10,14 +10,14 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false,
-    assetsDir: 'assets',
+    sourcemap: true,
     rollupOptions: {
       output: {
-        assetFileNames: 'assets/[name][extname]'
-      }
-    }
+        manualChunks: {
+          vendor: ['react', 'react-dom', '@supabase/supabase-js'],
+        },
+      },
+    },
   },
   base: '/',
-  publicDir: 'public'
 }) 
