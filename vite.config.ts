@@ -22,10 +22,5 @@ export default defineConfig(({ mode }) => {
       },
     },
     base: '/',
-    define: {
-      'process.env.TWILIO_ACCOUNT_SID': JSON.stringify(env.TWILIO_ACCOUNT_SID),
-      'process.env.TWILIO_AUTH_TOKEN': JSON.stringify(env.TWILIO_AUTH_TOKEN),
-      'process.env.TWILIO_WHATSAPP_NUMBER': JSON.stringify(env.TWILIO_WHATSAPP_NUMBER),
-    }
   }
 }) 

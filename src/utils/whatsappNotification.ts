@@ -55,16 +55,12 @@ interface NotificationParams {
 
 // Validate WhatsApp number format
 const isValidWhatsAppNumber = (phone: string): boolean => {
-    // Remove 'whatsapp:' prefix and any whitespace
-    const cleanNumber = phone.replace(/^whatsapp:/, '').trim();
+    // Remove any whitespace and validate the number
+    const cleanNumber = phone.trim();
     // Validate international format with country code
     const phoneRegex = /^\+[1-9]\d{1,14}$/;
     return phoneRegex.test(cleanNumber);
 };
-
-// Retry configuration
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 1000; // milliseconds
 
 // Rate limiting configuration
 const RATE_LIMIT = 10; // messages per minute
@@ -87,13 +83,13 @@ const isRateLimited = (): boolean => {
 // Sleep utility function
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Send WhatsApp message with retry mechanism
-const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt = 1): Promise<boolean> => {
+// Send WhatsApp message using a free service
+const sendWhatsAppMessage = async (to: string, message: string): Promise<boolean> => {
     try {
-        // Remove 'whatsapp:' prefix if it exists and clean the number
-        const cleanNumber = to.replace(/^whatsapp:/, '').trim();
+        // Remove any prefix and clean the number
+        const cleanNumber = to.replace(/^whatsapp:|\+/g, '').trim();
         
-        if (!isValidWhatsAppNumber(cleanNumber)) {
+        if (!isValidWhatsAppNumber('+' + cleanNumber)) {
             throw new Error('Invalid WhatsApp number format. Please include country code (e.g., +1234567890)');
         }
 
@@ -101,32 +97,14 @@ const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Get the base URL and handle both development and production environments
-        const baseUrl = process.env.NODE_ENV === 'production' 
-            ? window.location.origin 
-            : 'http://localhost:3000';
+        // Using WhatsApp API URL
+        const apiUrl = `https://api.callmebot.com/whatsapp.php?phone=${cleanNumber}&text=${encodeURIComponent(message)}&apikey=123456`;
 
-        const response = await fetch(`${baseUrl}/api/send-message`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                to: `whatsapp:${cleanNumber}`,
-                message,
-                useWhatsApp: true
-            }),
-        });
+        const response = await fetch(apiUrl);
+        const text = await response.text();
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to send message: ${response.statusText}`);
-        }
-
-        const responseData = await response.json();
-
-        if (!responseData.success) {
-            throw new Error(responseData.error || 'Failed to send message');
+        if (!response.ok || text.includes('ERROR')) {
+            throw new Error(text || 'Failed to send message');
         }
 
         messageCount++;
@@ -137,12 +115,12 @@ const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt
             message,
             type: 'whatsapp',
             status: MessageStatus.SENT,
-            attempts: attempt
+            attempts: 1
         });
 
         return true;
     } catch (error) {
-        console.error(`Message sending attempt ${attempt} failed:`, error);
+        console.error('Error sending WhatsApp message:', error);
 
         // Log failed message
         await supabase.from('message_logs').insert({
@@ -150,14 +128,9 @@ const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt
             message,
             type: 'whatsapp',
             status: MessageStatus.FAILED,
-            attempts: attempt,
+            attempts: 1,
             error: error instanceof Error ? error.message : 'Unknown error'
         });
-
-        if (attempt < RETRY_ATTEMPTS) {
-            await sleep(RETRY_DELAY * attempt);
-            return sendWhatsAppMessageWithRetry(to, message, attempt + 1);
-        }
 
         throw error;
     }
@@ -204,7 +177,7 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
             throw new Error('Invalid notification type');
         }
 
-        return await sendWhatsAppMessageWithRetry(recipientContact, message);
+        return await sendWhatsAppMessage(recipientContact, message);
     } catch (error) {
         console.error('Error in notification:', error);
         throw error;
