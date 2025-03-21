@@ -11,6 +11,7 @@ const SMS_TEMPLATES = {
         `Early Leave Alert: ${employeeName} checked out early at ${checkOutTime}`,
     OVERTIME: (employeeName: string, hours: number) =>
         `Overtime Alert: ${employeeName} has worked ${hours} hours overtime`,
+    ATTENDANCE_REPORT: (message: string) => message
 };
 
 // SMS Status Types
@@ -31,6 +32,8 @@ interface SMSNotificationParams {
     isEarlyLeave?: boolean;
     overtimeHours?: number;
     phoneNumber?: string;
+    customMessage?: string;
+    isAttendanceReport?: boolean;
 }
 
 // Validate phone number format
@@ -145,7 +148,9 @@ export const sendSMSNotification = async (params: SMSNotificationParams): Promis
 
         // Determine message template based on notification type
         let message: string;
-        if (params.isLate && params.checkInTime) {
+        if (params.isAttendanceReport && params.customMessage) {
+            message = SMS_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
+        } else if (params.isLate && params.checkInTime) {
             message = SMS_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime);
         } else if (params.isAbsent) {
             message = SMS_TEMPLATES.ABSENT(params.employeeName);
@@ -153,6 +158,8 @@ export const sendSMSNotification = async (params: SMSNotificationParams): Promis
             message = SMS_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime);
         } else if (params.overtimeHours !== undefined) {
             message = SMS_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours);
+        } else if (params.customMessage) {
+            message = params.customMessage;
         } else {
             throw new Error('Invalid notification type');
         }

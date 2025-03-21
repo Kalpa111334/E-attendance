@@ -12,8 +12,19 @@ import {
     Box,
     alpha,
     useTheme,
+    IconButton,
+    Tooltip,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
 } from '@mui/material';
+import { Share as ShareIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
+import { sendSMSNotification } from '../utils/smsNotification';
+import { toast } from 'react-toastify';
 
 interface AttendanceRecord {
     employee_id: string;
@@ -34,6 +45,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
     const theme = useTheme();
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(10);
+    const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
+    const [phoneNumber, setPhoneNumber] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
 
     const handleChangePage = (event: unknown, newPage: number) => {
         setPage(newPage);
@@ -42,6 +56,55 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
     const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
+    };
+
+    const formatAttendanceRecordsForSMS = (records: AttendanceRecord[]): string => {
+        const dateRange = records.length > 0 ? 
+            `${format(new Date(records[0].created_at), 'MMM dd')} - ${format(new Date(records[records.length - 1].created_at), 'MMM dd, yyyy')}` :
+            'No records';
+
+        let message = `Attendance Records (${dateRange})\n\n`;
+        
+        records.forEach((record, index) => {
+            if (index < 10) { // Limit to first 10 records to avoid SMS length issues
+                message += `${record.employees.first_name} ${record.employees.last_name}\n`;
+                message += `Time: ${format(new Date(record.created_at), 'hh:mm a')}\n`;
+                if (index < records.length - 1) message += '\n';
+            }
+        });
+
+        if (records.length > 10) {
+            message += `\n... and ${records.length - 10} more records`;
+        }
+
+        return message;
+    };
+
+    const handleShareViaSMS = async () => {
+        try {
+            setLoading(true);
+            const message = formatAttendanceRecordsForSMS(records);
+            
+            const success = await sendSMSNotification({
+                employeeName: 'Admin',
+                phoneNumber,
+                customMessage: message,
+                isAttendanceReport: true
+            });
+
+            if (success) {
+                toast.success('Attendance records shared successfully');
+                setShareDialogOpen(false);
+                setPhoneNumber('');
+            } else {
+                toast.error('Failed to share attendance records');
+            }
+        } catch (error) {
+            console.error('Error sharing attendance records:', error);
+            toast.error('Failed to share attendance records');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -56,19 +119,33 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                 border: theme => `1px solid ${alpha(theme.palette.divider, 0.1)}`,
             }}
         >
-            <Box p={3}>
-                <Typography
-                    variant="h6"
-                    sx={{
-                        fontWeight: 600,
-                        mb: 2,
-                        background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                    }}
-                >
-                    {title}
-                </Typography>
+            <Box sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography
+                        variant="h6"
+                        sx={{
+                            fontWeight: 600,
+                            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}
+                    >
+                        {title}
+                    </Typography>
+                    <Tooltip title="Share via SMS">
+                        <IconButton 
+                            onClick={() => setShareDialogOpen(true)}
+                            sx={{
+                                bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
+                                '&:hover': {
+                                    bgcolor: theme => alpha(theme.palette.primary.main, 0.2),
+                                }
+                            }}
+                        >
+                            <ShareIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
                 <TableContainer sx={{ maxHeight: 440 }}>
                     <Table stickyHeader>
                         <TableHead>
@@ -149,6 +226,55 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
                     onRowsPerPageChange={handleChangeRowsPerPage}
                 />
             </Box>
+
+            {/* Share Dialog */}
+            <Dialog 
+                open={shareDialogOpen} 
+                onClose={() => !loading && setShareDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 2,
+                        bgcolor: theme => alpha(theme.palette.background.paper, 0.9),
+                        backdropFilter: 'blur(20px)',
+                    }
+                }}
+            >
+                <DialogTitle>Share Attendance Records</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Enter the phone number to send the attendance records via SMS.
+                    </Typography>
+                    <TextField
+                        label="Phone Number"
+                        type="tel"
+                        fullWidth
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder="+1234567890"
+                        disabled={loading}
+                        sx={{ mt: 1 }}
+                        helperText="Include country code (e.g., +1 for USA)"
+                    />
+                </DialogContent>
+                <DialogActions sx={{ p: 2 }}>
+                    <Button 
+                        onClick={() => setShareDialogOpen(false)} 
+                        disabled={loading}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleShareViaSMS}
+                        disabled={!phoneNumber || loading}
+                        sx={{
+                            background: theme => `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                        }}
+                    >
+                        {loading ? 'Sending...' : 'Send SMS'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Paper>
     );
 };
