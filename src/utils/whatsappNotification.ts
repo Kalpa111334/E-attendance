@@ -175,23 +175,34 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Using TextBelt API (free tier)
-        const response = await fetch('https://textbelt.com/text', {
+        // Using TextLocal API (alternative to TextBelt)
+        const apiKey = import.meta.env.VITE_TEXTLOCAL_API_KEY || 'demo'; // Use 'demo' for testing
+        const sender = 'TXTLCL';
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('apikey', apiKey);
+        formData.append('numbers', cleanNumber);
+        formData.append('message', message);
+        formData.append('sender', sender);
+
+        // Make API request with proper CORS handling
+        const response = await fetch('https://api.textlocal.in/send/', {
             method: 'POST',
+            body: formData,
             headers: {
-                'Content-Type': 'application/json',
+                'Accept': 'application/json',
             },
-            body: JSON.stringify({
-                phone: cleanNumber,
-                message,
-                key: 'textbelt_test', // Use test key for development (1 free SMS per day)
-            }),
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
         const data = await response.json();
 
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to send SMS');
+        if (!data.status || data.status !== 'success') {
+            throw new Error(data.errors?.[0] || 'Failed to send SMS');
         }
 
         messageCount++;
@@ -202,7 +213,8 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             message,
             type: MessageType.SMS,
             status: MessageStatus.SENT,
-            attempts: 1
+            attempts: 1,
+            response: JSON.stringify(data)
         });
 
         return true;

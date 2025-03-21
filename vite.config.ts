@@ -22,5 +22,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     base: '/',
+    define: {
+      'import.meta.env.VITE_TEXTLOCAL_API_KEY': JSON.stringify(process.env.VITE_TEXTLOCAL_API_KEY),
+    },
   }
 }) 
