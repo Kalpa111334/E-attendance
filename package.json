@@ -30,7 +30,8 @@
     "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^6.11.1",
     "react-toastify": "^11.0.5",
-    "sweetalert2": "^11.17.2"
+    "sweetalert2": "^11.17.2",
+    "twilio": "^5.5.1"
   },
   "devDependencies": {
     "@mui/types": "^7.2.24",
