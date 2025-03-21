@@ -10,14 +10,16 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', '@supabase/supabase-js'],
+          vendor: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
         },
       },
     },
+    chunkSizeWarningLimit: 1600,
   },
-  base: '/',
+  base: './',
 }) 
