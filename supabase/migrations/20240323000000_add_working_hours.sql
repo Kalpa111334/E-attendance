@@ -70,16 +70,16 @@ CREATE OR REPLACE FUNCTION public.update_working_hours()
 RETURNS TRIGGER AS $$
 DECLARE
     last_record public.working_hours%ROWTYPE;
-    current_date DATE;
+    scan_date DATE;
 BEGIN
-    current_date := CURRENT_DATE;
+    scan_date := date(timezone('UTC', NEW.created_at));
     
     -- Try to find existing record for today
     SELECT *
     INTO last_record
     FROM public.working_hours
     WHERE employee_id = NEW.employee_id
-    AND date = current_date;
+    AND date = scan_date;
 
     IF NOT FOUND THEN
         -- First scan of the day - create check-in record
@@ -91,7 +91,7 @@ BEGIN
         ) VALUES (
             NEW.employee_id,
             NEW.created_at,
-            current_date,
+            scan_date,
             public.is_late_check_in(NEW.created_at)
         );
     ELSE

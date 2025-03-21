@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme, IconButton, Tooltip } from '@mui/material';
 import QrScanner from 'react-qr-scanner';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
-import { sendLateCheckInSMS } from '../utils/smsNotification';
+import { sendSMSNotification } from '../utils/smsNotification';
+import { FlipCameraIos as FlipCameraIcon } from '@mui/icons-material';
 
 interface QRCodeScannerProps {
     onResult?: (result: string) => void;
@@ -28,6 +29,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [scannedEmployee, setScannedEmployee] = useState<any>(null);
     const [showResult, setShowResult] = useState(false);
     const [workingHours, setWorkingHours] = useState<WorkingHoursRecord | null>(null);
+    const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
         if (!data?.text || loading) return;
@@ -35,11 +37,6 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         try {
             setLoading(true);
             setError(null);
-
-            // First verify the QR code format
-            if (!data.text.match(/^[A-Z0-9]+$/)) {
-                throw new Error('Invalid QR code format');
-            }
 
             // Get employee details
             const { data: employee, error: employeeError } = await supabase
@@ -49,26 +46,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 .single();
 
             if (employeeError) {
-                if (employeeError.code === 'PGRST116') {
-                    throw new Error('Employee not found');
-                }
-                throw new Error(`Database error: ${employeeError.message}`);
+                throw new Error(`Employee not found: ${employeeError.message}`);
             }
 
-            // Record the scan
-            const { error: scanError } = await supabase
-                .from('scans')
-                .insert({
-                    employee_id: data.text,
-                    scanned_by: user?.id
-                });
+            const today = format(new Date(), 'yyyy-MM-dd');
 
-            if (scanError) {
-                throw new Error(`Failed to record scan: ${scanError.message}`);
-            }
-
-            // Get today's working hours record
-            const today = new Date().toISOString().split('T')[0];
+            // Get working hours record
             const { data: hoursRecord, error: hoursError } = await supabase
                 .from('working_hours')
                 .select('*')
@@ -83,11 +66,33 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             // If this is a late check-in, send SMS notification
             if (hoursRecord?.is_late) {
                 const checkInTime = format(new Date(hoursRecord.check_in), 'hh:mm a');
-                await sendLateCheckInSMS({
+                await sendSMSNotification({
                     employeeName: `${employee.first_name} ${employee.last_name}`,
                     checkInTime,
                     isLate: true
                 });
+            }
+
+            // If employee hasn't checked in by a certain time, send absent notification
+            const currentHour = new Date().getHours();
+            if (!hoursRecord && currentHour >= 11) { // 11 AM threshold
+                await sendSMSNotification({
+                    employeeName: `${employee.first_name} ${employee.last_name}`,
+                    isAbsent: true
+                });
+            }
+
+            // If employee is leaving early, send notification
+            if (hoursRecord?.check_out) {
+                const checkOutTime = new Date(hoursRecord.check_out);
+                const workEndHour = 17; // 5 PM
+                if (checkOutTime.getHours() < workEndHour) {
+                    await sendSMSNotification({
+                        employeeName: `${employee.first_name} ${employee.last_name}`,
+                        checkOutTime: format(checkOutTime, 'hh:mm a'),
+                        isEarlyLeave: true
+                    });
+                }
             }
 
             setScannedEmployee(employee);
@@ -118,6 +123,10 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         setWorkingHours(null);
     };
 
+    const handleSwitchCamera = () => {
+        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+    };
+
     return (
         <Box sx={{ position: 'relative', width: '100%', maxWidth: 500, mx: 'auto' }}>
             {scanning ? (
@@ -131,7 +140,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         background: theme => alpha(theme.palette.background.paper, 0.8),
                         backdropFilter: 'blur(10px)',
                         border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                        animation: 'pulse 2s infinite',
+                            animation: 'pulse 2s infinite',
                         '@keyframes pulse': {
                             '0%': {
                                 boxShadow: theme => `0 0 0 0 ${alpha(theme.palette.primary.main, 0.4)}`
@@ -149,28 +158,50 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         onError={handleError}
                         onScan={handleScan}
                         style={{ width: '100%' }}
+                        constraints={{
+                            video: {
+                                facingMode: facingMode
+                            }
+                        }}
                     />
-                    <Box
-                        sx={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: 0,
-                            right: 0,
-                            height: '2px',
+                    <Tooltip title="Switch Camera">
+                        <IconButton
+                            onClick={handleSwitchCamera}
+                                        sx={{
+                                                position: 'absolute',
+                                top: 16,
+                                right: 16,
+                                backgroundColor: theme => alpha(theme.palette.background.paper, 0.8),
+                                backdropFilter: 'blur(4px)',
+                                '&:hover': {
+                                    backgroundColor: theme => alpha(theme.palette.background.paper, 0.9),
+                                }
+                            }}
+                        >
+                            <FlipCameraIcon />
+                        </IconButton>
+                    </Tooltip>
+                                        <Box
+                                            sx={{
+                                                position: 'absolute',
+                                                top: '50%',
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: '2px',
                             background: theme => `linear-gradient(90deg, 
                                 ${alpha(theme.palette.primary.main, 0)} 0%, 
                                 ${theme.palette.primary.main} 50%, 
                                 ${alpha(theme.palette.primary.main, 0)} 100%)`,
-                            animation: 'scan 2s linear infinite',
-                            '@keyframes scan': {
-                                '0%': {
+                                                    animation: 'scan 2s linear infinite',
+                                                '@keyframes scan': {
+                                                    '0%': {
                                     transform: 'translateY(-100px)',
                                     opacity: 0
-                                },
-                                '50%': {
+                                                    },
+                                                    '50%': {
                                     opacity: 1
-                                },
-                                '100%': {
+                                                    },
+                                                    '100%': {
                                     transform: 'translateY(100px)',
                                     opacity: 0
                                 }
@@ -183,7 +214,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                     <CircularProgress />
-                </Box>
+                                    </Box>
             )}
 
             {error && (
@@ -202,8 +233,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             {showResult && scannedEmployee && (
                 <Paper
                     elevation={0}
-                    sx={{
-                        p: 3,
+                    sx={{ 
+                        p: 3, 
                         mt: 2,
                         borderRadius: 4,
                         background: theme => alpha(theme.palette.background.paper, 0.8),
@@ -241,7 +272,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                    </Typography>
+                                                    </Typography>
                                 </>
                             )}
                         </>
