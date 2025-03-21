@@ -46,7 +46,7 @@ export const sendSMSNotification = async ({ employeeId, employeeName, scanTime, 
 
         // Send SMS to each admin
         const smsPromises = admins.map(admin => 
-            twilioClient.messages.create({
+            (twilioClient as NonNullable<typeof twilioClient>).messages.create({
                 body: message,
                 to: admin.admin_phone,
                 from: twilioFromNumber
