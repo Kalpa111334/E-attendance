@@ -55,8 +55,11 @@ interface NotificationParams {
 
 // Validate WhatsApp number format
 const isValidWhatsAppNumber = (phone: string): boolean => {
+    // Remove 'whatsapp:' prefix and any whitespace
+    const cleanNumber = phone.replace(/^whatsapp:/, '').trim();
+    // Validate international format with country code
     const phoneRegex = /^\+[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone);
+    return phoneRegex.test(cleanNumber);
 };
 
 // Retry configuration
@@ -87,7 +90,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // Send WhatsApp message with retry mechanism
 const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt = 1): Promise<boolean> => {
     try {
-        if (!isValidWhatsAppNumber(to)) {
+        // Remove 'whatsapp:' prefix if it exists and clean the number
+        const cleanNumber = to.replace(/^whatsapp:/, '').trim();
+        
+        if (!isValidWhatsAppNumber(cleanNumber)) {
             throw new Error('Invalid WhatsApp number format. Please include country code (e.g., +1234567890)');
         }
 
@@ -106,7 +112,7 @@ const sendWhatsAppMessageWithRetry = async (to: string, message: string, attempt
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ 
-                to: `whatsapp:${to.replace('whatsapp:', '')}`,
+                to: `whatsapp:${cleanNumber}`,
                 message,
                 useWhatsApp: true
             }),

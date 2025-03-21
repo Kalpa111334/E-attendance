@@ -82,19 +82,19 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
     };
 
     const validatePhoneNumber = (phone: string): boolean => {
-        // Remove whatsapp: prefix if present for validation
-        const cleanNumber = phone.replace('whatsapp:', '');
+        // Remove any whitespace and validate the number
+        const cleanNumber = phone.trim();
+        // Validate international format with country code
         const phoneRegex = /^\+[1-9]\d{1,14}$/;
         return phoneRegex.test(cleanNumber);
     };
 
     const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        // Remove whatsapp: prefix if user includes it
-        const cleanValue = value.replace('whatsapp:', '');
-        setPhoneNumber(cleanValue);
+        // Remove any whitespace from input
+        const value = e.target.value.trim();
+        setPhoneNumber(value);
         
-        if (cleanValue && !validatePhoneNumber(cleanValue)) {
+        if (value && !validatePhoneNumber(value)) {
             setPhoneError('Please enter a valid WhatsApp number with country code (e.g., +1234567890)');
         } else {
             setPhoneError(null);
@@ -112,12 +112,9 @@ const AttendanceTable: React.FC<AttendanceTableProps> = ({ records, title }) => 
             setPhoneError(null);
             const message = formatAttendanceRecordsForSMS(records);
             
-            // Add whatsapp: prefix to the phone number
-            const whatsappNumber = `whatsapp:${phoneNumber}`;
-            
             await sendNotification({
                 employeeName: 'Admin',
-                phoneNumber: whatsappNumber,
+                phoneNumber: phoneNumber.trim(),
                 customMessage: message,
                 isAttendanceReport: true
             });
