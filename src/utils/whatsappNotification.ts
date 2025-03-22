@@ -161,7 +161,7 @@ const sendWhatsAppMessage = async (to: string, message: string): Promise<boolean
     }
 };
 
-// Send SMS using TextLocal API
+// Send SMS using Free SMS API
 const sendSMSMessage = async (to: string, message: string): Promise<boolean> => {
     try {
         // Remove any prefix and clean the number
@@ -175,19 +175,37 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
             throw new Error('Rate limit exceeded. Please try again later.');
         }
 
-        // Using TextLocal API
-        const apiKey = import.meta.env.VITE_TEXTLOCAL_API_KEY || 'demo';
-        const sender = 'TXTLCL';
-        
-        // Create URL-encoded form data
-        const params = new URLSearchParams();
-        params.append('apikey', apiKey);
-        params.append('numbers', cleanNumber);
-        params.append('message', encodeURIComponent(message));
-        params.append('sender', sender);
+        // For development/testing, log the message and simulate success
+        if (import.meta.env.MODE === 'development') {
+            console.log('Development Mode - SMS would be sent:', {
+                to: cleanNumber,
+                message: message
+            });
+            
+            // Log successful test message
+            await supabase.from('message_logs').insert({
+                phone_number: to,
+                message,
+                type: MessageType.SMS,
+                status: MessageStatus.SENT,
+                attempts: 1,
+                response: JSON.stringify({ mode: 'development', status: 'simulated success' })
+            });
+
+            return true;
+        }
+
+        // Using Free SMS API service
+        const apiUrl = 'https://freesmsapi.com/send';
+        const params = new URLSearchParams({
+            number: cleanNumber,
+            message: encodeURIComponent(message),
+            sender_id: 'DigitalID',
+            type: 'text'
+        });
 
         // Make API request
-        const response = await fetch('https://api.textlocal.in/send/?' + params.toString(), {
+        const response = await fetch(`${apiUrl}?${params.toString()}`, {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -204,9 +222,8 @@ const sendSMSMessage = async (to: string, message: string): Promise<boolean> => 
         const data = await response.json();
         console.log('SMS API Response:', JSON.stringify(data, null, 2));
 
-        if (!data.status || data.status !== 'success') {
-            const errorMessage = data.errors ? JSON.stringify(data.errors) : 'Failed to send SMS';
-            throw new Error(errorMessage);
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Failed to send SMS');
         }
 
         messageCount++;
