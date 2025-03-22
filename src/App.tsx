@@ -36,6 +36,8 @@ import LoadingAnimation from './components/LoadingAnimation';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { startAttendanceReportWorker } from './workers/attendanceReportWorker';
+import { sendDailyAttendanceReport } from './utils/attendanceAutomation';
+import { toast } from 'react-toastify';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -253,9 +255,23 @@ export const Navigation: React.FC = () => {
 
 const App: React.FC = () => {
     useEffect(() => {
-        // Start the attendance report worker in development mode or production
+        // Start the attendance report worker
         if (typeof window !== 'undefined') {
-            startAttendanceReportWorker().catch(console.error);
+            // Start automated reports
+            startAttendanceReportWorker().catch(error => {
+                console.error('Failed to start attendance worker:', error);
+                toast.error('Failed to start automated reports');
+            });
+
+            // Send an immediate test report if in development
+            if (import.meta.env.MODE === 'development') {
+                sendDailyAttendanceReport()
+                    .then(() => toast.success('Test attendance report sent successfully'))
+                    .catch(error => {
+                        console.error('Failed to send test report:', error);
+                        toast.error('Failed to send test report');
+                    });
+            }
         }
     }, []);
 
