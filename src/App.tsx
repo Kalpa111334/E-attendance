@@ -19,6 +19,7 @@ import {
     Upload as UploadIcon,
     QrCodeScanner as ScannerIcon,
     Assessment as ReportsIcon,
+    Schedule as ScheduleIcon,
 } from '@mui/icons-material';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
@@ -38,6 +39,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { startAttendanceReportWorker } from './workers/attendanceReportWorker';
 import { sendDailyAttendanceReport } from './utils/attendanceAutomation';
 import { toast } from 'react-toastify';
+import RosterManagementPage from './pages/RosterManagementPage';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -219,6 +221,19 @@ export const Navigation: React.FC = () => {
                             >
                                 Reports
                             </Button>
+                            <Button
+                                color="inherit"
+                                component={Link}
+                                to="/roster"
+                                startIcon={<ScheduleIcon />}
+                                size="small"
+                                sx={{ 
+                                    fontSize: { xs: '0.875rem', md: '1rem' },
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                Roster
+                            </Button>
                         </Box>
                     )}
                     
@@ -318,6 +333,11 @@ const App: React.FC = () => {
                             <Route path="/attendance-report" element={
                                 <ProtectedRoute>
                                     <AttendanceReport />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/roster" element={
+                                <ProtectedRoute>
+                                    <RosterManagementPage />
                                 </ProtectedRoute>
                             } />
                         </Routes>
