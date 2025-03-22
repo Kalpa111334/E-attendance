@@ -4,7 +4,6 @@ import {
     Card,
     CardContent,
     Typography,
-    TextField,
     Button,
     Alert,
     CircularProgress,
@@ -18,6 +17,8 @@ import {
     Fade,
     Stack,
     Tooltip,
+    IconButton,
+    Divider,
 } from '@mui/material';
 import {
     CloudUpload as UploadIcon,
@@ -25,6 +26,8 @@ import {
     Error as ErrorIcon,
     FileCopy as CopyIcon,
     Download as DownloadIcon,
+    Description as FileIcon,
+    TableChart as ExcelIcon,
 } from '@mui/icons-material';
 import { supabase } from '../config/supabase';
 import type { EmployeeFormData } from '../types/employee';
@@ -32,6 +35,8 @@ import QRCode from 'qrcode';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 interface ProcessingResult {
     success: boolean;
@@ -41,359 +46,298 @@ interface ProcessingResult {
 }
 
 const BulkQRGenerator: React.FC = () => {
-    const [csvContent, setCsvContent] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState<ProcessingResult[]>([]);
+    const [error, setError] = useState<string | null>(null);
     const theme = useTheme();
 
-    const sampleCSV = `First Name,Last Name,Email,Department,Position
-John,Doe,john@example.com,Engineering,Developer
-Jane,Smith,jane@example.com,Marketing,Manager`;
+    const validateEmployeeData = (data: any): EmployeeFormData | null => {
+        const requiredFields = ['first_name', 'last_name', 'email', 'department', 'position'];
+        const employee: EmployeeFormData = {
+            first_name: data.first_name || data['First Name'] || '',
+            last_name: data.last_name || data['Last Name'] || '',
+            email: data.email || data['Email'] || '',
+            department: data.department || data['Department'] || '',
+            position: data.position || data['Position'] || '',
+        };
 
-    const copyExample = () => {
-        navigator.clipboard.writeText(sampleCSV);
-        toast.success('Example CSV copied to clipboard');
-    };
-
-    const downloadExample = () => {
-        const blob = new Blob([sampleCSV], { type: 'text/csv' });
-        saveAs(blob, 'example.csv');
-    };
-
-    const validateEmail = (email: string): boolean => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    };
-
-    const parseCSV = useCallback((content: string): EmployeeFormData[] => {
-        try {
-            const lines = content.trim().split('\n').filter(line => line.trim() !== '');
-            
-            if (lines.length < 2) {
-                throw new Error('CSV must contain both a header row and at least one data row');
+        // Check if all required fields are present
+        for (const field of requiredFields) {
+            if (!employee[field as keyof EmployeeFormData]) {
+                return null;
             }
-
-            const headers = lines[0].split(',').map(h => 
-                h.trim().toLowerCase().replace(/[\s_-]/g, '')
-            );
-
-            const headerMappings: Record<string, string> = {
-                'firstname': 'first_name',
-                'first': 'first_name',
-                'fname': 'first_name',
-                'givenname': 'first_name',
-                'lastname': 'last_name',
-                'last': 'last_name',
-                'lname': 'last_name',
-                'surname': 'last_name',
-                'email': 'email',
-                'emailaddress': 'email',
-                'mail': 'email',
-                'department': 'department',
-                'dept': 'department',
-                'division': 'department',
-                'position': 'position',
-                'title': 'position',
-                'role': 'position',
-            };
-
-            const normalizedHeaders = headers.map(h => headerMappings[h] || h);
-        const requiredHeaders = ['first_name', 'last_name', 'email', 'department', 'position'];
-        
-            const missingHeaders = requiredHeaders.filter(h => !normalizedHeaders.includes(h));
-            if (missingHeaders.length > 0) {
-                throw new Error(`Missing required headers: ${missingHeaders.join(', ')}`);
-            }
-
-            return lines.slice(1).map((line, index) => {
-            const values = line.split(',').map(v => v.trim());
-                
-                if (values.length !== headers.length) {
-                    throw new Error(`Row ${index + 2} has incorrect number of values`);
-                }
-
-                const employee: any = {};
-                normalizedHeaders.forEach((header, i) => {
-                    if (requiredHeaders.includes(header)) {
-                        employee[header] = values[i];
-                    }
-                });
-
-                // Validate data
-                if (!employee.first_name || !employee.last_name) {
-                    throw new Error(`Row ${index + 2}: Name fields cannot be empty`);
-                }
-                if (!validateEmail(employee.email)) {
-                    throw new Error(`Row ${index + 2}: Invalid email format`);
-                }
-                if (!employee.department || !employee.position) {
-                    throw new Error(`Row ${index + 2}: Department and Position are required`);
-                }
-
-            return employee;
-        });
-        } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`CSV parsing error: ${error.message}`);
-            }
-            throw new Error('An unknown error occurred while parsing the CSV');
         }
-    }, []);
 
-    const handleSubmit = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            setResults([]);
+        // Validate email format
+        const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+        if (!emailRegex.test(employee.email)) {
+            return null;
+        }
 
-            const employees = parseCSV(csvContent);
-            const results: ProcessingResult[] = [];
-            const zip = new JSZip();
+        return employee;
+    };
 
-            for (const employeeData of employees) {
+    const processExcelFile = (file: File): Promise<EmployeeFormData[]> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 try {
-                    // Generate unique employee_id
-                    const employee_id = `EMP${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
-                    const fullEmployeeData = {
-                        ...employeeData,
-                        employee_id,
-                        created_at: new Date().toISOString()
-                    };
-
-                    const { error: insertError } = await supabase
-                        .from('employees')
-                        .insert([fullEmployeeData])
-                        .select()
-                        .single();
-
-                    if (insertError) throw insertError;
-
-                    // Generate QR code
-                    const qrData = JSON.stringify({
-                        id: employee_id,
-                        name: `${employeeData.first_name} ${employeeData.last_name}`,
-                        email: employeeData.email
-                    });
-
-                    const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-                        errorCorrectionLevel: 'H',
-                        margin: 1,
-                        width: 300,
-                        color: {
-                            dark: theme.palette.primary.main,
-                            light: '#FFFFFF'
+                    const data = e.target?.result;
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    const validEmployees: EmployeeFormData[] = [];
+                    for (const row of jsonData) {
+                        const employee = validateEmployeeData(row);
+                        if (employee) {
+                            validEmployees.push(employee);
                         }
-                    });
-
-                    const base64Data = qrCodeDataUrl.split(',')[1];
-                    zip.file(`${employee_id}-qr.png`, base64Data, { base64: true });
-
-                    results.push({
-                        success: true,
-                        employee_id,
-                        message: `Successfully created: ${employeeData.first_name} ${employeeData.last_name}`
-                    });
-                } catch (err) {
-                    results.push({
-                        success: false,
-                        employee_id: '',
-                        message: `Failed: ${employeeData.first_name} ${employeeData.last_name}`,
-                        error: err instanceof Error ? err.message : 'An unknown error occurred'
-                    });
+                    }
+                    resolve(validEmployees);
+                } catch (error) {
+                    reject(error);
                 }
+            };
+            reader.onerror = (error) => reject(error);
+            reader.readAsBinaryString(file);
+        });
+    };
+
+    const processCsvFile = (file: File): Promise<EmployeeFormData[]> => {
+        return new Promise((resolve, reject) => {
+            Papa.parse<Record<string, string>>(file, {
+                header: true,
+                complete: (results: Papa.ParseResult<Record<string, string>>) => {
+                    const validEmployees: EmployeeFormData[] = [];
+                    for (const row of results.data) {
+                        const employee = validateEmployeeData(row);
+                        if (employee) {
+                            validEmployees.push(employee);
+                        }
+                    }
+                    resolve(validEmployees);
+                },
+                error: (error: Error, file: File) => reject(error),
+            });
+        });
+    };
+
+    const generateQRCodes = async (employees: EmployeeFormData[]) => {
+        const results: ProcessingResult[] = [];
+        const zip = new JSZip();
+        const qrFolder = zip.folder("qr-codes");
+
+        for (const employee of employees) {
+            try {
+                // Insert employee into database
+                const { data, error } = await supabase
+                    .from('employees')
+                    .insert([employee])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+
+                // Generate QR code
+                const qrCode = await QRCode.toDataURL(data.employee_id);
+                const qrData = qrCode.split(',')[1];
+                qrFolder?.file(`${data.employee_id}.png`, qrData, { base64: true });
+
+                results.push({
+                    success: true,
+                    employee_id: data.employee_id,
+                    message: `Successfully generated QR code for ${employee.first_name} ${employee.last_name}`,
+                });
+            } catch (error: any) {
+                results.push({
+                    success: false,
+                    employee_id: '',
+                    message: `Failed to process ${employee.first_name} ${employee.last_name}`,
+                    error: error.message,
+                });
+            }
+        }
+
+        // Generate and download zip file
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, "employee-qr-codes.zip");
+
+        return results;
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setProcessing(true);
+        setError(null);
+        setResults([]);
+
+        try {
+            let employees: EmployeeFormData[] = [];
+            
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                employees = await processExcelFile(file);
+            } else if (file.name.endsWith('.csv')) {
+                employees = await processCsvFile(file);
+            } else {
+                throw new Error('Unsupported file format. Please upload an XLSX or CSV file.');
             }
 
+            if (employees.length === 0) {
+                throw new Error('No valid employee data found in the file.');
+            }
+
+            const results = await generateQRCodes(employees);
             setResults(results);
-
-            // Download QR codes if any successful entries
-            const successfulResults = results.filter(r => r.success);
-            if (successfulResults.length > 0) {
-                const blob = await zip.generateAsync({ type: 'blob' });
-                saveAs(blob, `qr-codes-${new Date().toISOString()}.zip`);
-                toast.success(`Generated ${successfulResults.length} QR codes`);
-            }
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-            setError(errorMessage);
-            toast.error(errorMessage);
+            toast.success(`Successfully processed ${results.filter(r => r.success).length} employees`);
+        } catch (error: any) {
+            setError(error.message);
+            toast.error('Failed to process file');
         } finally {
-            setLoading(false);
+            setProcessing(false);
         }
     };
 
     return (
-        <Box sx={{
-            minHeight: '100vh',
-            background: `linear-gradient(135deg, 
-                ${alpha(theme.palette.primary.light, 0.15)} 0%, 
-                ${alpha(theme.palette.secondary.light, 0.15)} 50%,
-                ${alpha(theme.palette.primary.light, 0.15)} 100%)`,
-            py: 4,
-            px: { xs: 2, md: 4 },
-        }}>
-            <Fade in timeout={800}>
-                <Card sx={{
-                    maxWidth: 1200,
-                    margin: '0 auto',
-                    backdropFilter: 'blur(10px)',
-                    background: alpha(theme.palette.background.paper, 0.8),
-                    borderRadius: 4,
-                    boxShadow: theme.shadows[20],
-                }}>
-                    <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-                        <Typography 
-                            variant="h5" 
-                            sx={{
-                                mb: 3,
-                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                fontWeight: 700,
-                            }}
-                        >
+        <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4, p: 2 }}>
+            <Card
+                sx={{
+                    position: 'relative',
+                    overflow: 'visible',
+                    '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        top: -10,
+                        left: -10,
+                        right: -10,
+                        bottom: -10,
+                        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
+                        borderRadius: '20px',
+                        zIndex: -1,
+                    },
+                }}
+            >
+                <CardContent>
+                    <Typography variant="h5" gutterBottom sx={{
+                        fontWeight: 700,
+                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                    }}>
                         Bulk QR Code Generator
                     </Typography>
 
-                        <Alert 
-                            severity="info" 
-                            sx={{ 
-                                mb: 3,
-                                '& .MuiAlert-message': { width: '100%' }
+                    <Stack spacing={3} alignItems="center" sx={{ mt: 4 }}>
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3,
+                                width: '100%',
+                                border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
+                                borderRadius: 2,
+                                textAlign: 'center',
+                                background: alpha(theme.palette.background.paper, 0.8),
                             }}
                         >
-                            <Stack 
-                                direction="row" 
-                                justifyContent="space-between" 
-                                alignItems="center"
-                                spacing={2}
-                            >
-                                <Box>
-                                    <Typography variant="subtitle2" gutterBottom>
-                                        CSV Format Example:
-                    </Typography>
-                                    <Box component="pre" sx={{ 
-                                        bgcolor: 'background.paper',
-                                        p: 1,
-                                        borderRadius: 1,
-                                        fontSize: '0.875rem',
-                                        overflowX: 'auto'
-                                    }}>
-                                        {sampleCSV}
-                                    </Box>
-                                </Box>
-                                <Stack direction="row" spacing={1}>
-                                    <Tooltip title="Copy example">
-                                        <Button
-                                            size="small"
-                                            startIcon={<CopyIcon />}
-                                            onClick={copyExample}
-                                        >
-                                            Copy
-                                        </Button>
-                                    </Tooltip>
-                                    <Tooltip title="Download example">
-                                        <Button
-                                            size="small"
-                                            startIcon={<DownloadIcon />}
-                                            onClick={downloadExample}
-                                        >
-                                            Download
-                                        </Button>
-                                    </Tooltip>
-                                </Stack>
-                            </Stack>
-                        </Alert>
-
-                    {error && (
-                            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                            {error}
-                        </Alert>
-                    )}
-
-                    <TextField
-                        multiline
-                        rows={10}
-                        fullWidth
-                        placeholder="Paste your CSV content here..."
-                        value={csvContent}
-                        onChange={(e) => setCsvContent(e.target.value)}
-                        variant="outlined"
-                        sx={{ mb: 2 }}
-                    />
-
-                    <Button
-                        variant="contained"
-                        onClick={handleSubmit}
-                        disabled={loading || !csvContent.trim()}
-                        startIcon={loading ? <CircularProgress size={20} /> : <UploadIcon />}
-                            sx={{
-                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                '&:hover': {
-                                    background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.secondary.dark})`,
-                                }
-                            }}
-                    >
-                        {loading ? 'Processing...' : 'Generate QR Codes'}
-                    </Button>
-
-                    {results.length > 0 && (
-                        <Paper sx={{ mt: 3, p: 2 }}>
-                            <Typography variant="h6" gutterBottom>
-                                    Results ({results.filter(r => r.success).length} successful, {results.filter(r => !r.success).length} failed)
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls,.csv"
+                                onChange={handleFileUpload}
+                                style={{ display: 'none' }}
+                                id="file-upload"
+                            />
+                            <label htmlFor="file-upload">
+                                <Button
+                                    component="span"
+                                    variant="contained"
+                                    startIcon={<UploadIcon />}
+                                    disabled={processing}
+                                    sx={{
+                                        mb: 2,
+                                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                    }}
+                                >
+                                    Upload File
+                                </Button>
+                            </label>
+                            <Typography variant="body2" color="textSecondary">
+                                Upload XLSX or CSV file containing employee data
                             </Typography>
-                            <List>
-                                {results.map((result, index) => (
-                                    <ListItem key={index}>
-                                        <ListItemIcon>
-                                            {result.success ? (
-                                                <SuccessIcon color="success" />
-                                            ) : (
-                                                <ErrorIcon color="error" />
-                                            )}
-                                        </ListItemIcon>
-                                            <ListItemText 
-                                                primary={result.message}
-                                                secondary={result.error}
-                                            />
-                                    </ListItem>
-                                ))}
-                            </List>
+                            <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
+                                <Tooltip title="Excel file">
+                                    <IconButton size="small">
+                                        <ExcelIcon color="success" />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="CSV file">
+                                    <IconButton size="small">
+                                        <FileIcon color="primary" />
+                                    </IconButton>
+                                </Tooltip>
+                            </Stack>
                         </Paper>
-                    )}
 
-                        <Box sx={{ 
-                            mt: 4, 
-                            pt: 2, 
-                            borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                            textAlign: 'center' 
-                        }}>
-                            <Typography
-                                variant="subtitle2"
+                        {processing && (
+                            <CircularProgress 
+                                size={40}
                                 sx={{
-                                    background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    fontWeight: 700,
-                                    letterSpacing: 1,
-                                    animation: 'pulse 2s infinite',
-                                    '@keyframes pulse': {
-                                        '0%, 100%': {
-                                            opacity: 1,
-                                        },
-                                        '50%': {
-                                            opacity: 0.7,
-                                        },
-                                    },
+                                    color: theme.palette.primary.main,
+                                }}
+                            />
+                        )}
+
+                        {error && (
+                            <Alert 
+                                severity="error"
+                                sx={{
+                                    width: '100%',
+                                    borderRadius: 2,
                                 }}
                             >
-                                POWERED BY: MIDIZ
-                            </Typography>
-                        </Box>
+                                {error}
+                            </Alert>
+                        )}
+
+                        {results.length > 0 && (
+                            <Paper
+                                sx={{
+                                    width: '100%',
+                                    maxHeight: 300,
+                                    overflow: 'auto',
+                                    borderRadius: 2,
+                                }}
+                            >
+                                <List>
+                                    {results.map((result, index) => (
+                                        <React.Fragment key={index}>
+                                            <ListItem>
+                                                <ListItemIcon>
+                                                    {result.success ? (
+                                                        <SuccessIcon color="success" />
+                                                    ) : (
+                                                        <ErrorIcon color="error" />
+                                                    )}
+                                                </ListItemIcon>
+                                                <ListItemText
+                                                    primary={result.message}
+                                                    secondary={result.error}
+                                                    secondaryTypographyProps={{
+                                                        color: 'error',
+                                                    }}
+                                                />
+                                            </ListItem>
+                                            {index < results.length - 1 && <Divider />}
+                                        </React.Fragment>
+                                    ))}
+                                </List>
+                            </Paper>
+                        )}
+                    </Stack>
                 </CardContent>
             </Card>
-            </Fade>
         </Box>
     );
 };
