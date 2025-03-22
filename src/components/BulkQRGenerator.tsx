@@ -125,40 +125,40 @@ const BulkQRGenerator: React.FC = () => {
     };
 
     const generateQRCodes = async (employees: EmployeeFormData[]) => {
-        const results: ProcessingResult[] = [];
-        const zip = new JSZip();
+            const results: ProcessingResult[] = [];
+            const zip = new JSZip();
         const qrFolder = zip.folder("qr-codes");
 
         for (const employee of employees) {
             try {
                 // Insert employee into database
                 const { data, error } = await supabase
-                    .from('employees')
+                        .from('employees')
                     .insert([employee])
-                    .select()
-                    .single();
+                        .select()
+                        .single();
 
                 if (error) throw error;
 
-                // Generate QR code
+                    // Generate QR code
                 const qrCode = await QRCode.toDataURL(data.employee_id);
                 const qrData = qrCode.split(',')[1];
                 qrFolder?.file(`${data.employee_id}.png`, qrData, { base64: true });
 
-                results.push({
-                    success: true,
+                    results.push({
+                        success: true,
                     employee_id: data.employee_id,
                     message: `Successfully generated QR code for ${employee.first_name} ${employee.last_name}`,
-                });
+                    });
             } catch (error: any) {
-                results.push({
-                    success: false,
-                    employee_id: '',
+                    results.push({
+                        success: false,
+                        employee_id: '',
                     message: `Failed to process ${employee.first_name} ${employee.last_name}`,
                     error: error.message,
-                });
+                    });
+                }
             }
-        }
 
         // Generate and download zip file
         const content = await zip.generateAsync({ type: "blob" });
@@ -204,7 +204,7 @@ const BulkQRGenerator: React.FC = () => {
     return (
         <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4, p: 2 }}>
             <Card
-                sx={{
+                            sx={{
                     position: 'relative',
                     overflow: 'visible',
                     '&::before': {
@@ -223,9 +223,9 @@ const BulkQRGenerator: React.FC = () => {
                 <CardContent>
                     <Typography variant="h5" gutterBottom sx={{
                         fontWeight: 700,
-                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
+                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
                     }}>
                         Bulk QR Code Generator
                     </Typography>
@@ -233,7 +233,7 @@ const BulkQRGenerator: React.FC = () => {
                     <Stack spacing={3} alignItems="center" sx={{ mt: 4 }}>
                         <Paper
                             elevation={0}
-                            sx={{
+                            sx={{ 
                                 p: 3,
                                 width: '100%',
                                 border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
@@ -250,7 +250,7 @@ const BulkQRGenerator: React.FC = () => {
                                 id="file-upload"
                             />
                             <label htmlFor="file-upload">
-                                <Button
+                                        <Button
                                     component="span"
                                     variant="contained"
                                     startIcon={<UploadIcon />}
@@ -261,7 +261,7 @@ const BulkQRGenerator: React.FC = () => {
                                     }}
                                 >
                                     Upload File
-                                </Button>
+                                        </Button>
                             </label>
                             <Typography variant="body2" color="textSecondary">
                                 Upload XLSX or CSV file containing employee data
@@ -271,12 +271,12 @@ const BulkQRGenerator: React.FC = () => {
                                     <IconButton size="small">
                                         <ExcelIcon color="success" />
                                     </IconButton>
-                                </Tooltip>
+                                    </Tooltip>
                                 <Tooltip title="CSV file">
                                     <IconButton size="small">
                                         <FileIcon color="primary" />
                                     </IconButton>
-                                </Tooltip>
+                                    </Tooltip>
                             </Stack>
                         </Paper>
 
@@ -289,7 +289,7 @@ const BulkQRGenerator: React.FC = () => {
                             />
                         )}
 
-                        {error && (
+                    {error && (
                             <Alert 
                                 severity="error"
                                 sx={{
@@ -297,44 +297,44 @@ const BulkQRGenerator: React.FC = () => {
                                     borderRadius: 2,
                                 }}
                             >
-                                {error}
-                            </Alert>
-                        )}
+                            {error}
+                        </Alert>
+                    )}
 
                         {results.length > 0 && (
                             <Paper
-                                sx={{
+                            sx={{
                                     width: '100%',
                                     maxHeight: 300,
                                     overflow: 'auto',
                                     borderRadius: 2,
                                 }}
                             >
-                                <List>
-                                    {results.map((result, index) => (
+                            <List>
+                                {results.map((result, index) => (
                                         <React.Fragment key={index}>
                                             <ListItem>
-                                                <ListItemIcon>
-                                                    {result.success ? (
-                                                        <SuccessIcon color="success" />
-                                                    ) : (
-                                                        <ErrorIcon color="error" />
-                                                    )}
-                                                </ListItemIcon>
-                                                <ListItemText
-                                                    primary={result.message}
-                                                    secondary={result.error}
+                                        <ListItemIcon>
+                                            {result.success ? (
+                                                <SuccessIcon color="success" />
+                                            ) : (
+                                                <ErrorIcon color="error" />
+                                            )}
+                                        </ListItemIcon>
+                                            <ListItemText 
+                                                primary={result.message}
+                                                secondary={result.error}
                                                     secondaryTypographyProps={{
                                                         color: 'error',
                                                     }}
-                                                />
-                                            </ListItem>
+                                            />
+                                    </ListItem>
                                             {index < results.length - 1 && <Divider />}
                                         </React.Fragment>
-                                    ))}
-                                </List>
-                            </Paper>
-                        )}
+                                ))}
+                            </List>
+                        </Paper>
+                    )}
                     </Stack>
                 </CardContent>
             </Card>

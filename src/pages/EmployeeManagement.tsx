@@ -189,7 +189,7 @@ const EmployeeManagement = () => {
     };
 
     return (
-        <Box sx={{ 
+            <Box sx={{ 
             maxWidth: 1200, 
             mx: 'auto', 
             mt: { xs: 2, sm: 3, md: 4 }, 
@@ -204,7 +204,7 @@ const EmployeeManagement = () => {
                             variant="scrollable"
                             scrollButtons="auto"
                             allowScrollButtonsMobile
-                            sx={{
+                    sx={{
                                 '& .MuiTab-root': {
                                     minHeight: { xs: 48, sm: 64 },
                                     fontSize: { xs: '0.875rem', sm: '1rem' },
@@ -242,7 +242,7 @@ const EmployeeManagement = () => {
                                 }}
                             />
                         </Tabs>
-                    </Box>
+            </Box>
 
                     <TabPanel value={tabValue} index={0}>
                         <Stack 
@@ -288,31 +288,31 @@ const EmployeeManagement = () => {
                             </Button>
                         </Stack>
 
-                        {loading ? (
+            {loading ? (
                             <Box sx={{ display: 'flex', justifyContent: 'center', p: { xs: 2, sm: 4 } }}>
-                                <CircularProgress />
-                            </Box>
-                        ) : error ? (
-                            <Alert severity="error" onClose={() => setError(null)}>
-                                {error}
-                            </Alert>
-                        ) : (
+                    <CircularProgress />
+                </Box>
+            ) : error ? (
+                <Alert severity="error" onClose={() => setError(null)}>
+                    {error}
+                </Alert>
+            ) : (
                             <Grid container spacing={{ xs: 2, sm: 3 }}>
-                                {filteredEmployees.map((employee) => (
-                                    <Grid item xs={12} sm={6} md={4} key={employee.id}>
-                                        <Card 
-                                            sx={{
-                                                height: '100%',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                                '&:hover': {
+                    {filteredEmployees.map((employee) => (
+                        <Grid item xs={12} sm={6} md={4} key={employee.id}>
+                            <Card 
+                                sx={{
+                                    height: '100%',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                    '&:hover': {
                                                     transform: { xs: 'none', sm: 'translateY(-4px)' },
-                                                    boxShadow: theme.shadows[8],
-                                                },
-                                            }}
-                                        >
-                                            <CardContent>
+                                        boxShadow: theme.shadows[8],
+                                    },
+                                }}
+                            >
+                                <CardContent>
                                                 <Box sx={{ 
                                                     display: 'flex', 
                                                     alignItems: 'center', 
@@ -320,17 +320,17 @@ const EmployeeManagement = () => {
                                                     flexDirection: { xs: 'column', sm: 'row' },
                                                     textAlign: { xs: 'center', sm: 'left' }
                                                 }}>
-                                                    <Avatar
-                                                        src={employee.avatar_url}
-                                                        sx={{ 
+                                        <Avatar
+                                            src={employee.avatar_url}
+                                            sx={{ 
                                                             width: { xs: 48, sm: 56 }, 
                                                             height: { xs: 48, sm: 56 },
                                                             mb: { xs: 1, sm: 0 },
-                                                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                                        }}
-                                                    >
-                                                        {employee.first_name[0]}
-                                                    </Avatar>
+                                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                            }}
+                                        >
+                                            {employee.first_name[0]}
+                                        </Avatar>
                                                     <Box sx={{ 
                                                         ml: { xs: 0, sm: 2 },
                                                         flex: 1 
@@ -338,22 +338,22 @@ const EmployeeManagement = () => {
                                                         <Typography variant="h6" sx={{
                                                             fontSize: { xs: '1rem', sm: '1.25rem' }
                                                         }}>
-                                                            {employee.first_name} {employee.last_name}
-                                                        </Typography>
-                                                        <Typography variant="body2" color="textSecondary">
-                                                            {employee.position}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Chip
-                                                        label={employee.status}
-                                                        color={employee.status === 'active' ? 'success' : 'default'}
-                                                        size="small"
+                                                {employee.first_name} {employee.last_name}
+                                            </Typography>
+                                            <Typography variant="body2" color="textSecondary">
+                                                {employee.position}
+                                            </Typography>
+                                        </Box>
+                                        <Chip
+                                            label={employee.status}
+                                            color={employee.status === 'active' ? 'success' : 'default'}
+                                            size="small"
                                                         sx={{ 
                                                             mt: { xs: 1, sm: 0 },
                                                             fontSize: { xs: '0.75rem', sm: '0.875rem' }
                                                         }}
-                                                    />
-                                                </Box>
+                                        />
+                                    </Box>
 
                                                 <Typography 
                                                     variant="body2" 
@@ -363,8 +363,8 @@ const EmployeeManagement = () => {
                                                         textAlign: { xs: 'center', sm: 'left' }
                                                     }}
                                                 >
-                                                    {employee.email}
-                                                </Typography>
+                                        {employee.email}
+                                    </Typography>
 
                                                 <Box sx={{ 
                                                     display: 'flex', 
@@ -372,12 +372,12 @@ const EmployeeManagement = () => {
                                                     mb: { xs: 1, sm: 2 },
                                                     justifyContent: { xs: 'center', sm: 'flex-start' }
                                                 }}>
-                                                    <Chip
-                                                        label={employee.department}
-                                                        size="small"
-                                                        sx={{
-                                                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                                            color: 'white',
+                                        <Chip
+                                            label={employee.department}
+                                            size="small"
+                                            sx={{
+                                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                                color: 'white',
                                                             fontSize: { xs: '0.75rem', sm: '0.875rem' }
                                                         }}
                                                     />
@@ -386,134 +386,134 @@ const EmployeeManagement = () => {
                                                         color="textSecondary" 
                                                         sx={{ ml: 1 }}
                                                     >
-                                                        ID: {employee.employee_id}
-                                                    </Typography>
-                                                </Box>
+                                            ID: {employee.employee_id}
+                                        </Typography>
+                                    </Box>
 
-                                                <Box sx={{ 
-                                                    display: 'flex', 
+                                    <Box sx={{ 
+                                        display: 'flex', 
                                                     justifyContent: 'space-around',
                                                     mt: { xs: 2, sm: 'auto' }, 
                                                     pt: { xs: 1, sm: 2 },
-                                                    borderTop: `1px solid ${theme.palette.divider}`
-                                                }}>
-                                                    <Tooltip title="Generate QR Code">
-                                                        <IconButton 
-                                                            onClick={() => handleGenerateQR(employee)}
-                                                            disabled={processingId === employee.id.toString()}
+                                        borderTop: `1px solid ${theme.palette.divider}`
+                                    }}>
+                                        <Tooltip title="Generate QR Code">
+                                            <IconButton 
+                                                onClick={() => handleGenerateQR(employee)}
+                                                disabled={processingId === employee.id.toString()}
                                                             sx={{ 
                                                                 '& svg': { 
                                                                     fontSize: { xs: 20, sm: 24 } 
                                                                 }
                                                             }}
-                                                        >
-                                                            {processingId === employee.id.toString() ? 
+                                            >
+                                                {processingId === employee.id.toString() ? 
                                                                 <CircularProgress size={20} /> : 
-                                                                <QrCodeIcon />
-                                                            }
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Edit">
-                                                        <IconButton 
-                                                            onClick={() => navigate(`/employees/edit/${employee.employee_id}`)}
-                                                            color="primary"
+                                                    <QrCodeIcon />
+                                                }
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Edit">
+                                            <IconButton 
+                                                onClick={() => navigate(`/employees/edit/${employee.employee_id}`)}
+                                                color="primary"
                                                             sx={{ 
                                                                 '& svg': { 
                                                                     fontSize: { xs: 20, sm: 24 } 
                                                                 }
                                                             }}
-                                                        >
-                                                            <EditIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Delete">
-                                                        <IconButton 
-                                                            onClick={() => {
-                                                                setSelectedEmployee(employee);
-                                                                setIsDeleteDialogOpen(true);
-                                                            }}
-                                                            color="error"
+                                            >
+                                                <EditIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Delete">
+                                            <IconButton 
+                                                onClick={() => {
+                                                    setSelectedEmployee(employee);
+                                                    setIsDeleteDialogOpen(true);
+                                                }}
+                                                color="error"
                                                             sx={{ 
                                                                 '& svg': { 
                                                                     fontSize: { xs: 20, sm: 24 } 
                                                                 }
                                                             }}
-                                                        >
-                                                            <DeleteIcon />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                </Box>
-                                            </CardContent>
-                                        </Card>
-                                    </Grid>
-                                ))}
-                            </Grid>
-                        )}
+                                            >
+                                                <DeleteIcon />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
 
-                        {/* Sort Menu */}
-                        <Menu
-                            anchorEl={anchorEl}
-                            open={Boolean(anchorEl)}
-                            onClose={() => setAnchorEl(null)}
-                        >
-                            <MenuItem 
-                                onClick={() => {
-                                    setSortBy('recent');
-                                    setAnchorEl(null);
-                                }}
-                                selected={sortBy === 'recent'}
-                            >
-                                Most Recent
-                            </MenuItem>
-                            <MenuItem 
-                                onClick={() => {
-                                    setSortBy('name');
-                                    setAnchorEl(null);
-                                }}
-                                selected={sortBy === 'name'}
-                            >
-                                Name
-                            </MenuItem>
-                            <MenuItem 
-                                onClick={() => {
-                                    setSortBy('department');
-                                    setAnchorEl(null);
-                                }}
-                                selected={sortBy === 'department'}
-                            >
-                                Department
-                            </MenuItem>
-                        </Menu>
+            {/* Sort Menu */}
+            <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={() => setAnchorEl(null)}
+            >
+                <MenuItem 
+                    onClick={() => {
+                        setSortBy('recent');
+                        setAnchorEl(null);
+                    }}
+                    selected={sortBy === 'recent'}
+                >
+                    Most Recent
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => {
+                        setSortBy('name');
+                        setAnchorEl(null);
+                    }}
+                    selected={sortBy === 'name'}
+                >
+                    Name
+                </MenuItem>
+                <MenuItem 
+                    onClick={() => {
+                        setSortBy('department');
+                        setAnchorEl(null);
+                    }}
+                    selected={sortBy === 'department'}
+                >
+                    Department
+                </MenuItem>
+            </Menu>
 
-                        {/* Filter Menu */}
-                        <Menu
-                            anchorEl={filterAnchorEl}
-                            open={Boolean(filterAnchorEl)}
-                            onClose={() => setFilterAnchorEl(null)}
-                        >
-                            <MenuItem 
-                                onClick={() => {
-                                    setFilterDepartment('all');
-                                    setFilterAnchorEl(null);
-                                }}
-                                selected={filterDepartment === 'all'}
-                            >
-                                All Departments
-                            </MenuItem>
-                            <Divider />
-                            {departments.map(dept => (
-                                <MenuItem 
-                                    key={dept}
-                                    onClick={() => {
-                                        setFilterDepartment(dept);
-                                        setFilterAnchorEl(null);
-                                    }}
-                                    selected={filterDepartment === dept}
-                                >
-                                    {dept}
-                                </MenuItem>
-                            ))}
-                        </Menu>
+            {/* Filter Menu */}
+            <Menu
+                anchorEl={filterAnchorEl}
+                open={Boolean(filterAnchorEl)}
+                onClose={() => setFilterAnchorEl(null)}
+            >
+                <MenuItem 
+                    onClick={() => {
+                        setFilterDepartment('all');
+                        setFilterAnchorEl(null);
+                    }}
+                    selected={filterDepartment === 'all'}
+                >
+                    All Departments
+                </MenuItem>
+                <Divider />
+                {departments.map(dept => (
+                    <MenuItem 
+                        key={dept}
+                        onClick={() => {
+                            setFilterDepartment(dept);
+                            setFilterAnchorEl(null);
+                        }}
+                        selected={filterDepartment === dept}
+                    >
+                        {dept}
+                    </MenuItem>
+                ))}
+            </Menu>
                     </TabPanel>
 
                     <TabPanel value={tabValue} index={1}>

@@ -113,13 +113,24 @@ const RosterManagement: React.FC = () => {
             const { data, error } = await supabase
                 .from('employees')
                 .select('id, employee_id, first_name, last_name, department, position, avatar_url')
-                .eq('status', 'active');
+                .eq('status', 'active')
+                .order('first_name', { ascending: true });
 
-            if (error) throw error;
-            setEmployees(data || []);
+            if (error) {
+                console.error('Supabase error:', error);
+                setError(`Failed to fetch employees: ${error.message}`);
+                return;
+            }
+
+            if (!data) {
+                setEmployees([]);
+                return;
+            }
+
+            setEmployees(data);
         } catch (err) {
             console.error('Error fetching employees:', err);
-            setError('Failed to fetch employees');
+            setError('Failed to fetch employees. Please try again later.');
         }
     };
 
