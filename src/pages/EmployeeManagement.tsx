@@ -197,7 +197,7 @@ const EmployeeManagement = () => {
         }}>
             <Card>
                 <CardContent>
-                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
                         <Tabs 
                             value={tabValue} 
                             onChange={handleTabChange}
@@ -209,9 +209,15 @@ const EmployeeManagement = () => {
                                     minHeight: { xs: 48, sm: 64 },
                                     fontSize: { xs: '0.875rem', sm: '1rem' },
                                     fontWeight: 600,
+                                    minWidth: { xs: 'auto', sm: 160 },
+                                    px: { xs: 2, sm: 3 },
                                 },
                                 '& .Mui-selected': {
                                     color: theme.palette.primary.main,
+                                },
+                                '& .MuiTabs-indicator': {
+                                    backgroundColor: theme.palette.primary.main,
+                                    height: 3,
                                 },
                             }}
                         >
@@ -228,7 +234,12 @@ const EmployeeManagement = () => {
                             <Tab 
                                 icon={<ScheduleIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />} 
                                 iconPosition="start" 
-                                label="Roster" 
+                                label="Roster"
+                                sx={{
+                                    '&.Mui-selected': {
+                                        background: alpha(theme.palette.primary.main, 0.1),
+                                    },
+                                }}
                             />
                         </Tabs>
                     </Box>
@@ -511,10 +522,11 @@ const EmployeeManagement = () => {
 
                     <TabPanel value={tabValue} index={2}>
                         <Box sx={{ 
-                            background: alpha(theme.palette.background.paper, 0.8),
-                            borderRadius: theme.shape.borderRadius,
-                            backdropFilter: 'blur(8px)',
-                            p: { xs: 1, sm: 2 }
+                            background: theme.palette.background.paper,
+                            borderRadius: 2,
+                            boxShadow: theme.shadows[1],
+                            p: { xs: 2, sm: 3 },
+                            minHeight: 400,
                         }}>
                             <RosterManagement />
                         </Box>
