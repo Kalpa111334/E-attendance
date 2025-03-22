@@ -510,7 +510,14 @@ const EmployeeManagement = () => {
                     </TabPanel>
 
                     <TabPanel value={tabValue} index={2}>
-                        <RosterManagement />
+                        <Box sx={{ 
+                            background: alpha(theme.palette.background.paper, 0.8),
+                            borderRadius: theme.shape.borderRadius,
+                            backdropFilter: 'blur(8px)',
+                            p: { xs: 1, sm: 2 }
+                        }}>
+                            <RosterManagement />
+                        </Box>
                     </TabPanel>
                 </CardContent>
             </Card>
