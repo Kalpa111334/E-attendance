@@ -40,6 +40,8 @@ import { startAttendanceReportWorker } from './workers/attendanceReportWorker';
 import { sendDailyAttendanceReport } from './utils/attendanceAutomation';
 import { toast } from 'react-toastify';
 import RosterManagementPage from './pages/RosterManagementPage';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -292,60 +294,62 @@ const App: React.FC = () => {
 
     return (
         <ErrorBoundary>
-            <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-                <Navigation />
-                <Box sx={{ flex: 1 }}>
-                    <React.Suspense fallback={<LoadingAnimation />}>
-                        <Routes>
-                            <Route path="/" element={<LandingPage />} />
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/dashboard" element={
-                                <ProtectedRoute>
-                                    <Dashboard />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/employees" element={
-                                <ProtectedRoute>
-                                    <EmployeeList />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/employees/new" element={
-                                <ProtectedRoute>
-                                    <EmployeeForm />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/employees/edit/:employeeId" element={
-                                <ProtectedRoute>
-                                    <EmployeeForm />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/bulk-generate" element={
-                                <ProtectedRoute>
-                                    <BulkQRGenerator />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/scanner" element={
-                                <ProtectedRoute>
-                                    <QRCodeScanner />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/qr/:employeeId" element={<QRCodeView />} />
-                            <Route path="/attendance-report" element={
-                                <ProtectedRoute>
-                                    <AttendanceReport />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/roster" element={
-                                <ProtectedRoute>
-                                    <RosterManagementPage />
-                                </ProtectedRoute>
-                            } />
-                        </Routes>
-                    </React.Suspense>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+                    <Navigation />
+                    <Box sx={{ flex: 1 }}>
+                        <React.Suspense fallback={<LoadingAnimation />}>
+                            <Routes>
+                                <Route path="/" element={<LandingPage />} />
+                                <Route path="/login" element={<Login />} />
+                                <Route path="/dashboard" element={
+                                    <ProtectedRoute>
+                                        <Dashboard />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/employees" element={
+                                    <ProtectedRoute>
+                                        <EmployeeList />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/employees/new" element={
+                                    <ProtectedRoute>
+                                        <EmployeeForm />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/employees/edit/:employeeId" element={
+                                    <ProtectedRoute>
+                                        <EmployeeForm />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/bulk-generate" element={
+                                    <ProtectedRoute>
+                                        <BulkQRGenerator />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/scanner" element={
+                                    <ProtectedRoute>
+                                        <QRCodeScanner />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/qr/:employeeId" element={<QRCodeView />} />
+                                <Route path="/attendance-report" element={
+                                    <ProtectedRoute>
+                                        <AttendanceReport />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/roster" element={
+                                    <ProtectedRoute>
+                                        <RosterManagementPage />
+                                    </ProtectedRoute>
+                                } />
+                            </Routes>
+                        </React.Suspense>
+                    </Box>
+                    <Footer />
+                    <ToastContainer position="top-right" autoClose={3000} />
                 </Box>
-                <Footer />
-                <ToastContainer position="top-right" autoClose={3000} />
-            </Box>
+            </LocalizationProvider>
         </ErrorBoundary>
     );
 };

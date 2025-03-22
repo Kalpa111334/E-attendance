@@ -186,7 +186,7 @@ const RosterManagement: React.FC = () => {
                     <DatePicker
                         label="Select Date"
                         value={selectedDate}
-                        onChange={(newValue) => newValue && setSelectedDate(newValue)}
+                        onChange={(newValue: Date | null) => newValue && setSelectedDate(newValue)}
                         sx={{ width: { xs: '100%', sm: 200 } }}
                     />
                     <Button
