@@ -32,7 +32,6 @@ import {
 import { supabase } from '../config/supabase';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { LocalizationProvider, DatePicker, TimePicker } from '@mui/x-date-pickers';
-import { format } from 'date-fns';
 
 interface Shift {
     id: number;
@@ -53,6 +52,21 @@ interface Employee {
     position: string;
     avatar_url?: string;
 }
+
+// Helper function for date formatting
+const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Helper function for time formatting
+const formatTime = (date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
 
 const RosterManagement: React.FC = () => {
     const [shifts, setShifts] = useState<Shift[]>([]);
@@ -115,7 +129,7 @@ const RosterManagement: React.FC = () => {
             const { data, error } = await supabase
                 .from('shifts')
                 .select('*')
-                .eq('date', format(selectedDate, 'yyyy-MM-dd'))
+                .eq('date', formatDate(selectedDate))
                 .order('start_time', { ascending: true });
 
             if (error) throw error;
@@ -134,9 +148,9 @@ const RosterManagement: React.FC = () => {
         try {
             const newShift = {
                 employee_id: selectedEmployee,
-                date: format(selectedDate, 'yyyy-MM-dd'),
-                start_time: format(startTime, 'HH:mm'),
-                end_time: format(endTime, 'HH:mm'),
+                date: formatDate(selectedDate),
+                start_time: formatTime(startTime),
+                end_time: formatTime(endTime),
                 shift_type: selectedShiftType,
             };
 
