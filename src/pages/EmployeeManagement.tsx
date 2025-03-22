@@ -5,7 +5,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     CircularProgress, Alert, useTheme, alpha,
     InputAdornment, Menu, MenuItem, Divider,
-    Tab, Tabs
+    Tab, Tabs, Stack
 } from '@mui/material';
 import {
     Add as AddIcon,
