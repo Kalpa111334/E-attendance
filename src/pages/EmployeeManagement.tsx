@@ -187,16 +187,25 @@ const EmployeeManagement = () => {
     };
 
     return (
-        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+        <Box sx={{ 
+            maxWidth: 1200, 
+            mx: 'auto', 
+            mt: { xs: 2, sm: 3, md: 4 }, 
+            p: { xs: 1, sm: 2, md: 3 }
+        }}>
             <Card>
                 <CardContent>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                         <Tabs 
                             value={tabValue} 
                             onChange={handleTabChange}
+                            variant="scrollable"
+                            scrollButtons="auto"
+                            allowScrollButtonsMobile
                             sx={{
                                 '& .MuiTab-root': {
-                                    minHeight: 64,
+                                    minHeight: { xs: 48, sm: 64 },
+                                    fontSize: { xs: '0.875rem', sm: '1rem' },
                                     fontWeight: 600,
                                 },
                                 '& .Mui-selected': {
@@ -205,12 +214,12 @@ const EmployeeManagement = () => {
                             }}
                         >
                             <Tab 
-                                icon={<QrCodeIcon />} 
+                                icon={<QrCodeIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />} 
                                 iconPosition="start" 
                                 label="Employee List" 
                             />
                             <Tab 
-                                icon={<UploadIcon />} 
+                                icon={<UploadIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />} 
                                 iconPosition="start" 
                                 label="Bulk Upload" 
                             />
@@ -218,7 +227,11 @@ const EmployeeManagement = () => {
                     </Box>
 
                     <TabPanel value={tabValue} index={0}>
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+                        <Stack 
+                            direction={{ xs: 'column', sm: 'row' }} 
+                            spacing={{ xs: 2, sm: 3 }} 
+                            sx={{ mb: { xs: 2, sm: 3 } }}
+                        >
                             <TextField
                                 fullWidth
                                 size="small"
@@ -233,30 +246,32 @@ const EmployeeManagement = () => {
                                     ),
                                 }}
                             />
-                            <Grid item xs={6} md={3}>
-                                <Button
-                                    fullWidth
-                                    startIcon={<FilterIcon />}
-                                    onClick={(e) => setFilterAnchorEl(e.currentTarget)}
-                                    variant="outlined"
-                                >
-                                    Filter
-                                </Button>
-                            </Grid>
-                            <Grid item xs={6} md={3}>
-                                <Button
-                                    fullWidth
-                                    startIcon={<SortIcon />}
-                                    onClick={(e) => setAnchorEl(e.currentTarget)}
-                                    variant="outlined"
-                                >
-                                    Sort By
-                                </Button>
-                            </Grid>
+                            <Button
+                                startIcon={<FilterIcon />}
+                                onClick={(e) => setFilterAnchorEl(e.currentTarget)}
+                                variant="outlined"
+                                sx={{ 
+                                    minWidth: { xs: '100%', sm: 120 },
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                Filter
+                            </Button>
+                            <Button
+                                startIcon={<SortIcon />}
+                                onClick={(e) => setAnchorEl(e.currentTarget)}
+                                variant="outlined"
+                                sx={{ 
+                                    minWidth: { xs: '100%', sm: 120 },
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                Sort By
+                            </Button>
                         </Stack>
 
                         {loading ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: { xs: 2, sm: 4 } }}>
                                 <CircularProgress />
                             </Box>
                         ) : error ? (
@@ -264,7 +279,7 @@ const EmployeeManagement = () => {
                                 {error}
                             </Alert>
                         ) : (
-                            <Grid container spacing={3}>
+                            <Grid container spacing={{ xs: 2, sm: 3 }}>
                                 {filteredEmployees.map((employee) => (
                                     <Grid item xs={12} sm={6} md={4} key={employee.id}>
                                         <Card 
@@ -274,25 +289,37 @@ const EmployeeManagement = () => {
                                                 flexDirection: 'column',
                                                 transition: 'transform 0.2s, box-shadow 0.2s',
                                                 '&:hover': {
-                                                    transform: 'translateY(-4px)',
+                                                    transform: { xs: 'none', sm: 'translateY(-4px)' },
                                                     boxShadow: theme.shadows[8],
                                                 },
                                             }}
                                         >
                                             <CardContent>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                <Box sx={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    mb: { xs: 1, sm: 2 },
+                                                    flexDirection: { xs: 'column', sm: 'row' },
+                                                    textAlign: { xs: 'center', sm: 'left' }
+                                                }}>
                                                     <Avatar
                                                         src={employee.avatar_url}
                                                         sx={{ 
-                                                            width: 56, 
-                                                            height: 56,
+                                                            width: { xs: 48, sm: 56 }, 
+                                                            height: { xs: 48, sm: 56 },
+                                                            mb: { xs: 1, sm: 0 },
                                                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                                                         }}
                                                     >
                                                         {employee.first_name[0]}
                                                     </Avatar>
-                                                    <Box sx={{ ml: 2, flex: 1 }}>
-                                                        <Typography variant="h6">
+                                                    <Box sx={{ 
+                                                        ml: { xs: 0, sm: 2 },
+                                                        flex: 1 
+                                                    }}>
+                                                        <Typography variant="h6" sx={{
+                                                            fontSize: { xs: '1rem', sm: '1.25rem' }
+                                                        }}>
                                                             {employee.first_name} {employee.last_name}
                                                         </Typography>
                                                         <Typography variant="body2" color="textSecondary">
@@ -303,41 +330,67 @@ const EmployeeManagement = () => {
                                                         label={employee.status}
                                                         color={employee.status === 'active' ? 'success' : 'default'}
                                                         size="small"
+                                                        sx={{ 
+                                                            mt: { xs: 1, sm: 0 },
+                                                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                                                        }}
                                                     />
                                                 </Box>
 
-                                                <Typography variant="body2" color="textSecondary" gutterBottom>
+                                                <Typography 
+                                                    variant="body2" 
+                                                    color="textSecondary" 
+                                                    sx={{ 
+                                                        mb: { xs: 1, sm: 2 },
+                                                        textAlign: { xs: 'center', sm: 'left' }
+                                                    }}
+                                                >
                                                     {employee.email}
                                                 </Typography>
 
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                <Box sx={{ 
+                                                    display: 'flex', 
+                                                    alignItems: 'center', 
+                                                    mb: { xs: 1, sm: 2 },
+                                                    justifyContent: { xs: 'center', sm: 'flex-start' }
+                                                }}>
                                                     <Chip
                                                         label={employee.department}
                                                         size="small"
                                                         sx={{
                                                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                                                             color: 'white',
+                                                            fontSize: { xs: '0.75rem', sm: '0.875rem' }
                                                         }}
                                                     />
-                                                    <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+                                                    <Typography 
+                                                        variant="caption" 
+                                                        color="textSecondary" 
+                                                        sx={{ ml: 1 }}
+                                                    >
                                                         ID: {employee.employee_id}
                                                     </Typography>
                                                 </Box>
 
                                                 <Box sx={{ 
                                                     display: 'flex', 
-                                                    justifyContent: 'space-between',
-                                                    mt: 'auto', 
-                                                    pt: 2,
+                                                    justifyContent: 'space-around',
+                                                    mt: { xs: 2, sm: 'auto' }, 
+                                                    pt: { xs: 1, sm: 2 },
                                                     borderTop: `1px solid ${theme.palette.divider}`
                                                 }}>
                                                     <Tooltip title="Generate QR Code">
                                                         <IconButton 
                                                             onClick={() => handleGenerateQR(employee)}
                                                             disabled={processingId === employee.id.toString()}
+                                                            sx={{ 
+                                                                '& svg': { 
+                                                                    fontSize: { xs: 20, sm: 24 } 
+                                                                }
+                                                            }}
                                                         >
                                                             {processingId === employee.id.toString() ? 
-                                                                <CircularProgress size={24} /> : 
+                                                                <CircularProgress size={20} /> : 
                                                                 <QrCodeIcon />
                                                             }
                                                         </IconButton>
@@ -346,6 +399,11 @@ const EmployeeManagement = () => {
                                                         <IconButton 
                                                             onClick={() => navigate(`/employees/edit/${employee.employee_id}`)}
                                                             color="primary"
+                                                            sx={{ 
+                                                                '& svg': { 
+                                                                    fontSize: { xs: 20, sm: 24 } 
+                                                                }
+                                                            }}
                                                         >
                                                             <EditIcon />
                                                         </IconButton>
@@ -357,6 +415,11 @@ const EmployeeManagement = () => {
                                                                 setIsDeleteDialogOpen(true);
                                                             }}
                                                             color="error"
+                                                            sx={{ 
+                                                                '& svg': { 
+                                                                    fontSize: { xs: 20, sm: 24 } 
+                                                                }
+                                                            }}
                                                         >
                                                             <DeleteIcon />
                                                         </IconButton>
@@ -445,18 +508,30 @@ const EmployeeManagement = () => {
             <Dialog
                 open={isDeleteDialogOpen}
                 onClose={() => setIsDeleteDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        width: { xs: '90%', sm: 'auto' },
+                        minWidth: { sm: 400 },
+                        p: { xs: 1, sm: 2 }
+                    }
+                }}
             >
-                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogTitle sx={{ 
+                    fontSize: { xs: '1.25rem', sm: '1.5rem' }
+                }}>
+                    Confirm Delete
+                </DialogTitle>
                 <DialogContent>
-                    <Typography>
+                    <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                         Are you sure you want to delete {selectedEmployee?.first_name} {selectedEmployee?.last_name}?
                         This action cannot be undone.
                     </Typography>
                 </DialogContent>
-                <DialogActions>
+                <DialogActions sx={{ p: { xs: 1, sm: 2 } }}>
                     <Button 
                         onClick={() => setIsDeleteDialogOpen(false)}
                         disabled={!!processingId}
+                        sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
                     >
                         Cancel
                     </Button>
@@ -465,8 +540,9 @@ const EmployeeManagement = () => {
                         color="error"
                         variant="contained"
                         disabled={!!processingId}
+                        sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
                     >
-                        {processingId ? <CircularProgress size={24} /> : 'Delete'}
+                        {processingId ? <CircularProgress size={20} /> : 'Delete'}
                     </Button>
                 </DialogActions>
             </Dialog>
