@@ -17,12 +17,14 @@ import {
     Delete as DeleteIcon,
     Download as DownloadIcon,
     Sort as SortIcon,
-    CloudUpload as UploadIcon
+    CloudUpload as UploadIcon,
+    Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import { supabase } from '../config/supabase';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import BulkEmployeeUpload from '../components/BulkEmployeeUpload';
+import RosterManagement from '../components/RosterManagement';
 
 interface Employee {
     id: number;
@@ -222,6 +224,11 @@ const EmployeeManagement = () => {
                                 icon={<UploadIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />} 
                                 iconPosition="start" 
                                 label="Bulk Upload" 
+                            />
+                            <Tab 
+                                icon={<ScheduleIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />} 
+                                iconPosition="start" 
+                                label="Roster" 
                             />
                         </Tabs>
                     </Box>
@@ -500,6 +507,10 @@ const EmployeeManagement = () => {
 
                     <TabPanel value={tabValue} index={1}>
                         <BulkEmployeeUpload />
+                    </TabPanel>
+
+                    <TabPanel value={tabValue} index={2}>
+                        <RosterManagement />
                     </TabPanel>
                 </CardContent>
             </Card>
