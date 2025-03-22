@@ -175,197 +175,203 @@ const RosterManagement: React.FC = () => {
     };
 
     return (
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Box sx={{ p: { xs: 1, sm: 2 } }}>
-                <Stack 
-                    direction={{ xs: 'column', sm: 'row' }} 
-                    spacing={2} 
-                    alignItems={{ xs: 'stretch', sm: 'center' }}
-                    sx={{ mb: 3 }}
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+            <Stack 
+                direction={{ xs: 'column', sm: 'row' }} 
+                spacing={2} 
+                alignItems={{ xs: 'stretch', sm: 'center' }}
+                sx={{ mb: 3 }}
+            >
+                <DatePicker
+                    label="Select Date"
+                    value={selectedDate}
+                    onChange={(newValue: Date | null) => newValue && setSelectedDate(newValue)}
+                    slotProps={{ 
+                        textField: { 
+                            fullWidth: true,
+                            size: "medium",
+                        } 
+                    }}
+                    sx={{ width: { xs: '100%', sm: 200 } }}
+                />
+                <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setIsAddShiftOpen(true)}
+                    sx={{
+                        height: { sm: 56 },
+                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                    }}
                 >
-                    <DatePicker
-                        label="Select Date"
-                        value={selectedDate}
-                        onChange={(newValue: Date | null) => newValue && setSelectedDate(newValue)}
-                        sx={{ width: { xs: '100%', sm: 200 } }}
-                    />
-                    <Button
+                    Add Shift
+                </Button>
+            </Stack>
+
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+                    {error}
+                </Alert>
+            )}
+
+            {loading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                    <CircularProgress />
+                </Box>
+            ) : (
+                <Grid container spacing={2}>
+                    {Object.entries(shiftTypes).map(([type, { label, color }]) => (
+                        <Grid item xs={12} md={4} key={type}>
+                            <Paper
+                                sx={{
+                                    p: 2,
+                                    height: '100%',
+                                    background: alpha(color, 0.05),
+                                    borderRadius: 2,
+                                }}
+                            >
+                                <Typography 
+                                    variant="h6" 
+                                    gutterBottom
+                                    sx={{ 
+                                        color: color,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                    }}
+                                >
+                                    <ScheduleIcon />
+                                    {label}
+                                </Typography>
+                                <Stack spacing={2}>
+                                    {shifts
+                                        .filter(shift => shift.shift_type === type)
+                                        .map(shift => {
+                                            const employee = employees.find(
+                                                emp => emp.employee_id === shift.employee_id
+                                            );
+                                            return (
+                                                <Card
+                                                    key={shift.id}
+                                                    sx={{
+                                                        p: 1,
+                                                        background: alpha(color, 0.1),
+                                                    }}
+                                                >
+                                                    <Stack
+                                                        direction="row"
+                                                        alignItems="center"
+                                                        spacing={1}
+                                                    >
+                                                        <Avatar
+                                                            src={employee?.avatar_url}
+                                                            sx={{ width: 32, height: 32 }}
+                                                        >
+                                                            {employee?.first_name[0]}
+                                                        </Avatar>
+                                                        <Box sx={{ flex: 1 }}>
+                                                            <Typography variant="subtitle2">
+                                                                {getEmployeeName(shift.employee_id)}
+                                                            </Typography>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="textSecondary"
+                                                            >
+                                                                {shift.start_time} - {shift.end_time}
+                                                            </Typography>
+                                                        </Box>
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            onClick={() => handleDeleteShift(shift.id)}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Stack>
+                                                </Card>
+                                            );
+                                        })}
+                                    {shifts.filter(shift => shift.shift_type === type).length === 0 && (
+                                        <Typography
+                                            variant="body2"
+                                            color="textSecondary"
+                                            align="center"
+                                            sx={{ py: 2 }}
+                                        >
+                                            No shifts scheduled
+                                        </Typography>
+                                    )}
+                                </Stack>
+                            </Paper>
+                        </Grid>
+                    ))}
+                </Grid>
+            )}
+
+            {/* Add Shift Dialog */}
+            <Dialog 
+                open={isAddShiftOpen} 
+                onClose={() => setIsAddShiftOpen(false)}
+                maxWidth="sm"
+                fullWidth
+            >
+                <DialogTitle>Add New Shift</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={3} sx={{ mt: 2 }}>
+                        <TextField
+                            select
+                            label="Employee"
+                            value={selectedEmployee}
+                            onChange={(e) => setSelectedEmployee(e.target.value)}
+                            fullWidth
+                        >
+                            {employees.map((employee) => (
+                                <MenuItem key={employee.employee_id} value={employee.employee_id}>
+                                    {employee.first_name} {employee.last_name} - {employee.department}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+
+                        <TextField
+                            select
+                            label="Shift Type"
+                            value={selectedShiftType}
+                            onChange={(e) => setSelectedShiftType(e.target.value as 'morning' | 'afternoon' | 'night')}
+                            fullWidth
+                        >
+                            {Object.entries(shiftTypes).map(([type, { label }]) => (
+                                <MenuItem key={type} value={type}>
+                                    {label}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+
+                        <TimePicker
+                            label="Start Time"
+                            value={startTime}
+                            onChange={(newValue: Date | null) => setStartTime(newValue)}
+                            slotProps={{ textField: { fullWidth: true } }}
+                        />
+
+                        <TimePicker
+                            label="End Time"
+                            value={endTime}
+                            onChange={(newValue: Date | null) => setEndTime(newValue)}
+                            slotProps={{ textField: { fullWidth: true } }}
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setIsAddShiftOpen(false)}>Cancel</Button>
+                    <Button 
+                        onClick={handleAddShift}
                         variant="contained"
-                        startIcon={<AddIcon />}
-                        onClick={() => setIsAddShiftOpen(true)}
-                        sx={{
-                            height: { sm: 56 },
-                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                        }}
+                        disabled={!selectedEmployee || !startTime || !endTime}
                     >
                         Add Shift
                     </Button>
-                </Stack>
-
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-                        {error}
-                    </Alert>
-                )}
-
-                {loading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <Grid container spacing={2}>
-                        {Object.entries(shiftTypes).map(([type, { label, color }]) => (
-                            <Grid item xs={12} md={4} key={type}>
-                                <Paper
-                                    sx={{
-                                        p: 2,
-                                        height: '100%',
-                                        background: alpha(color, 0.05),
-                                        borderRadius: 2,
-                                    }}
-                                >
-                                    <Typography 
-                                        variant="h6" 
-                                        gutterBottom
-                                        sx={{ 
-                                            color: color,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                        }}
-                                    >
-                                        <ScheduleIcon />
-                                        {label}
-                                    </Typography>
-                                    <Stack spacing={2}>
-                                        {shifts
-                                            .filter(shift => shift.shift_type === type)
-                                            .map(shift => {
-                                                const employee = employees.find(
-                                                    emp => emp.employee_id === shift.employee_id
-                                                );
-                                                return (
-                                                    <Card
-                                                        key={shift.id}
-                                                        sx={{
-                                                            p: 1,
-                                                            background: alpha(color, 0.1),
-                                                        }}
-                                                    >
-                                                        <Stack
-                                                            direction="row"
-                                                            alignItems="center"
-                                                            spacing={1}
-                                                        >
-                                                            <Avatar
-                                                                src={employee?.avatar_url}
-                                                                sx={{ width: 32, height: 32 }}
-                                                            >
-                                                                {employee?.first_name[0]}
-                                                            </Avatar>
-                                                            <Box sx={{ flex: 1 }}>
-                                                                <Typography variant="subtitle2">
-                                                                    {getEmployeeName(shift.employee_id)}
-                                                                </Typography>
-                                                                <Typography
-                                                                    variant="caption"
-                                                                    color="textSecondary"
-                                                                >
-                                                                    {shift.start_time} - {shift.end_time}
-                                                                </Typography>
-                                                            </Box>
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => handleDeleteShift(shift.id)}
-                                                            >
-                                                                <DeleteIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </Stack>
-                                                    </Card>
-                                                );
-                                            })}
-                                        {shifts.filter(shift => shift.shift_type === type).length === 0 && (
-                                            <Typography
-                                                variant="body2"
-                                                color="textSecondary"
-                                                align="center"
-                                                sx={{ py: 2 }}
-                                            >
-                                                No shifts scheduled
-                                            </Typography>
-                                        )}
-                                    </Stack>
-                                </Paper>
-                            </Grid>
-                        ))}
-                    </Grid>
-                )}
-
-                {/* Add Shift Dialog */}
-                <Dialog 
-                    open={isAddShiftOpen} 
-                    onClose={() => setIsAddShiftOpen(false)}
-                    maxWidth="sm"
-                    fullWidth
-                >
-                    <DialogTitle>Add New Shift</DialogTitle>
-                    <DialogContent>
-                        <Stack spacing={3} sx={{ mt: 2 }}>
-                            <TextField
-                                select
-                                label="Employee"
-                                value={selectedEmployee}
-                                onChange={(e) => setSelectedEmployee(e.target.value)}
-                                fullWidth
-                            >
-                                {employees.map((employee) => (
-                                    <MenuItem key={employee.employee_id} value={employee.employee_id}>
-                                        {employee.first_name} {employee.last_name} - {employee.department}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-
-                            <TextField
-                                select
-                                label="Shift Type"
-                                value={selectedShiftType}
-                                onChange={(e) => setSelectedShiftType(e.target.value as any)}
-                                fullWidth
-                            >
-                                {Object.entries(shiftTypes).map(([type, { label }]) => (
-                                    <MenuItem key={type} value={type}>
-                                        {label}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-
-                            <TimePicker
-                                label="Start Time"
-                                value={startTime}
-                                onChange={setStartTime}
-                            />
-
-                            <TimePicker
-                                label="End Time"
-                                value={endTime}
-                                onChange={setEndTime}
-                            />
-                        </Stack>
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setIsAddShiftOpen(false)}>Cancel</Button>
-                        <Button 
-                            onClick={handleAddShift}
-                            variant="contained"
-                            disabled={!selectedEmployee || !startTime || !endTime}
-                        >
-                            Add Shift
-                        </Button>
-                    </DialogActions>
-                </Dialog>
-            </Box>
-        </LocalizationProvider>
+                </DialogActions>
+            </Dialog>
+        </Box>
     );
 };
 
