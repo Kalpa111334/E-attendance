@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     AppBar,
@@ -35,6 +35,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import LoadingAnimation from './components/LoadingAnimation';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { startAttendanceReportWorker } from './workers/attendanceReportWorker';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -251,6 +252,13 @@ export const Navigation: React.FC = () => {
 };
 
 const App: React.FC = () => {
+    useEffect(() => {
+        // Start the attendance report worker in development mode or production
+        if (typeof window !== 'undefined') {
+            startAttendanceReportWorker().catch(console.error);
+        }
+    }, []);
+
     return (
         <ErrorBoundary>
             <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
