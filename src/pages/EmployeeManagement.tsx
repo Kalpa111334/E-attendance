@@ -4,7 +4,8 @@ import {
     Button, IconButton, Avatar, Chip, Tooltip,
     Dialog, DialogTitle, DialogContent, DialogActions,
     CircularProgress, Alert, useTheme, alpha,
-    InputAdornment, Menu, MenuItem, Divider
+    InputAdornment, Menu, MenuItem, Divider,
+    Tab, Tabs
 } from '@mui/material';
 import {
     Add as AddIcon,
@@ -15,11 +16,13 @@ import {
     Edit as EditIcon,
     Delete as DeleteIcon,
     Download as DownloadIcon,
-    Sort as SortIcon
+    Sort as SortIcon,
+    CloudUpload as UploadIcon
 } from '@mui/icons-material';
 import { supabase } from '../config/supabase';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
+import BulkEmployeeUpload from '../components/BulkEmployeeUpload';
 
 interface Employee {
     id: number;
@@ -34,6 +37,32 @@ interface Employee {
     created_at: string;
 }
 
+interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
+
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`employee-tabpanel-${index}`}
+            aria-labelledby={`employee-tab-${index}`}
+            {...other}
+        >
+            {value === index && (
+                <Box sx={{ py: 3 }}>
+                    {children}
+                </Box>
+            )}
+        </div>
+    );
+}
+
 const EmployeeManagement = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
@@ -46,6 +75,7 @@ const EmployeeManagement = () => {
     const [filterAnchorEl, setFilterAnchorEl] = useState<null | HTMLElement>(null);
     const [sortBy, setSortBy] = useState<'name' | 'department' | 'recent'>('recent');
     const [filterDepartment, setFilterDepartment] = useState<string>('all');
+    const [tabValue, setTabValue] = useState(0);
 
     const theme = useTheme();
     const navigate = useNavigate();
@@ -152,253 +182,264 @@ const EmployeeManagement = () => {
     // Get unique departments
     const departments = [...new Set(employees.map(emp => emp.department))];
 
-    return (
-        <Box sx={{ p: 3, maxWidth: 1400, margin: '0 auto' }}>
-            {/* Header Section */}
-            <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center',
-                mb: 4 
-            }}>
-                <Typography variant="h4" fontWeight="bold">
-                    Employee Management
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => navigate('/employees/new')}
-                    sx={{
-                        background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                        boxShadow: `0 2px 10px ${alpha(theme.palette.primary.main, 0.3)}`,
-                    }}
-                >
-                    Add Employee
-                </Button>
-            </Box>
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setTabValue(newValue);
+    };
 
-            {/* Search and Filter Section */}
-            <Card sx={{ mb: 4, boxShadow: theme.shadows[2] }}>
+    return (
+        <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, p: 2 }}>
+            <Card>
                 <CardContent>
-                    <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} md={6}>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                        <Tabs 
+                            value={tabValue} 
+                            onChange={handleTabChange}
+                            sx={{
+                                '& .MuiTab-root': {
+                                    minHeight: 64,
+                                    fontWeight: 600,
+                                },
+                                '& .Mui-selected': {
+                                    color: theme.palette.primary.main,
+                                },
+                            }}
+                        >
+                            <Tab 
+                                icon={<QrCodeIcon />} 
+                                iconPosition="start" 
+                                label="Employee List" 
+                            />
+                            <Tab 
+                                icon={<UploadIcon />} 
+                                iconPosition="start" 
+                                label="Bulk Upload" 
+                            />
+                        </Tabs>
+                    </Box>
+
+                    <TabPanel value={tabValue} index={0}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
                             <TextField
                                 fullWidth
+                                size="small"
                                 placeholder="Search employees..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 InputProps={{
                                     startAdornment: (
                                         <InputAdornment position="start">
-                                            <SearchIcon color="action" />
+                                            <SearchIcon />
                                         </InputAdornment>
                                     ),
                                 }}
                             />
-                        </Grid>
-                        <Grid item xs={6} md={3}>
-                            <Button
-                                fullWidth
-                                startIcon={<FilterIcon />}
-                                onClick={(e) => setFilterAnchorEl(e.currentTarget)}
-                                variant="outlined"
-                            >
-                                Filter
-                            </Button>
-                        </Grid>
-                        <Grid item xs={6} md={3}>
-                            <Button
-                                fullWidth
-                                startIcon={<SortIcon />}
-                                onClick={(e) => setAnchorEl(e.currentTarget)}
-                                variant="outlined"
-                            >
-                                Sort By
-                            </Button>
-                        </Grid>
-                    </Grid>
-                </CardContent>
-            </Card>
+                            <Grid item xs={6} md={3}>
+                                <Button
+                                    fullWidth
+                                    startIcon={<FilterIcon />}
+                                    onClick={(e) => setFilterAnchorEl(e.currentTarget)}
+                                    variant="outlined"
+                                >
+                                    Filter
+                                </Button>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                                <Button
+                                    fullWidth
+                                    startIcon={<SortIcon />}
+                                    onClick={(e) => setAnchorEl(e.currentTarget)}
+                                    variant="outlined"
+                                >
+                                    Sort By
+                                </Button>
+                            </Grid>
+                        </Stack>
 
-            {/* Employee Cards */}
-            {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-                    <CircularProgress />
-                </Box>
-            ) : error ? (
-                <Alert severity="error" onClose={() => setError(null)}>
-                    {error}
-                </Alert>
-            ) : (
-                <Grid container spacing={3}>
-                    {filteredEmployees.map((employee) => (
-                        <Grid item xs={12} sm={6} md={4} key={employee.id}>
-                            <Card 
-                                sx={{
-                                    height: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    '&:hover': {
-                                        transform: 'translateY(-4px)',
-                                        boxShadow: theme.shadows[8],
-                                    },
-                                }}
-                            >
-                                <CardContent>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                        <Avatar
-                                            src={employee.avatar_url}
-                                            sx={{ 
-                                                width: 56, 
-                                                height: 56,
-                                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                        {loading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : error ? (
+                            <Alert severity="error" onClose={() => setError(null)}>
+                                {error}
+                            </Alert>
+                        ) : (
+                            <Grid container spacing={3}>
+                                {filteredEmployees.map((employee) => (
+                                    <Grid item xs={12} sm={6} md={4} key={employee.id}>
+                                        <Card 
+                                            sx={{
+                                                height: '100%',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                '&:hover': {
+                                                    transform: 'translateY(-4px)',
+                                                    boxShadow: theme.shadows[8],
+                                                },
                                             }}
                                         >
-                                            {employee.first_name[0]}
-                                        </Avatar>
-                                        <Box sx={{ ml: 2, flex: 1 }}>
-                                            <Typography variant="h6">
-                                                {employee.first_name} {employee.last_name}
-                                            </Typography>
-                                            <Typography variant="body2" color="textSecondary">
-                                                {employee.position}
-                                            </Typography>
-                                        </Box>
-                                        <Chip
-                                            label={employee.status}
-                                            color={employee.status === 'active' ? 'success' : 'default'}
-                                            size="small"
-                                        />
-                                    </Box>
+                                            <CardContent>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                    <Avatar
+                                                        src={employee.avatar_url}
+                                                        sx={{ 
+                                                            width: 56, 
+                                                            height: 56,
+                                                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                                        }}
+                                                    >
+                                                        {employee.first_name[0]}
+                                                    </Avatar>
+                                                    <Box sx={{ ml: 2, flex: 1 }}>
+                                                        <Typography variant="h6">
+                                                            {employee.first_name} {employee.last_name}
+                                                        </Typography>
+                                                        <Typography variant="body2" color="textSecondary">
+                                                            {employee.position}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Chip
+                                                        label={employee.status}
+                                                        color={employee.status === 'active' ? 'success' : 'default'}
+                                                        size="small"
+                                                    />
+                                                </Box>
 
-                                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                                        {employee.email}
-                                    </Typography>
+                                                <Typography variant="body2" color="textSecondary" gutterBottom>
+                                                    {employee.email}
+                                                </Typography>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                        <Chip
-                                            label={employee.department}
-                                            size="small"
-                                            sx={{
-                                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                                                color: 'white',
-                                            }}
-                                        />
-                                        <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
-                                            ID: {employee.employee_id}
-                                        </Typography>
-                                    </Box>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                    <Chip
+                                                        label={employee.department}
+                                                        size="small"
+                                                        sx={{
+                                                            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                                                            color: 'white',
+                                                        }}
+                                                    />
+                                                    <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
+                                                        ID: {employee.employee_id}
+                                                    </Typography>
+                                                </Box>
 
-                                    <Box sx={{ 
-                                        display: 'flex', 
-                                        justifyContent: 'space-between',
-                                        mt: 'auto', 
-                                        pt: 2,
-                                        borderTop: `1px solid ${theme.palette.divider}`
-                                    }}>
-                                        <Tooltip title="Generate QR Code">
-                                            <IconButton 
-                                                onClick={() => handleGenerateQR(employee)}
-                                                disabled={processingId === employee.id.toString()}
-                                            >
-                                                {processingId === employee.id.toString() ? 
-                                                    <CircularProgress size={24} /> : 
-                                                    <QrCodeIcon />
-                                                }
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Edit">
-                                            <IconButton 
-                                                onClick={() => navigate(`/employees/edit/${employee.employee_id}`)}
-                                                color="primary"
-                                            >
-                                                <EditIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Delete">
-                                            <IconButton 
-                                                onClick={() => {
-                                                    setSelectedEmployee(employee);
-                                                    setIsDeleteDialogOpen(true);
-                                                }}
-                                                color="error"
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </Box>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
+                                                <Box sx={{ 
+                                                    display: 'flex', 
+                                                    justifyContent: 'space-between',
+                                                    mt: 'auto', 
+                                                    pt: 2,
+                                                    borderTop: `1px solid ${theme.palette.divider}`
+                                                }}>
+                                                    <Tooltip title="Generate QR Code">
+                                                        <IconButton 
+                                                            onClick={() => handleGenerateQR(employee)}
+                                                            disabled={processingId === employee.id.toString()}
+                                                        >
+                                                            {processingId === employee.id.toString() ? 
+                                                                <CircularProgress size={24} /> : 
+                                                                <QrCodeIcon />
+                                                            }
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Edit">
+                                                        <IconButton 
+                                                            onClick={() => navigate(`/employees/edit/${employee.employee_id}`)}
+                                                            color="primary"
+                                                        >
+                                                            <EditIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton 
+                                                            onClick={() => {
+                                                                setSelectedEmployee(employee);
+                                                                setIsDeleteDialogOpen(true);
+                                                            }}
+                                                            color="error"
+                                                        >
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                ))}
+                            </Grid>
+                        )}
 
-            {/* Sort Menu */}
-            <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={() => setAnchorEl(null)}
-            >
-                <MenuItem 
-                    onClick={() => {
-                        setSortBy('recent');
-                        setAnchorEl(null);
-                    }}
-                    selected={sortBy === 'recent'}
-                >
-                    Most Recent
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => {
-                        setSortBy('name');
-                        setAnchorEl(null);
-                    }}
-                    selected={sortBy === 'name'}
-                >
-                    Name
-                </MenuItem>
-                <MenuItem 
-                    onClick={() => {
-                        setSortBy('department');
-                        setAnchorEl(null);
-                    }}
-                    selected={sortBy === 'department'}
-                >
-                    Department
-                </MenuItem>
-            </Menu>
+                        {/* Sort Menu */}
+                        <Menu
+                            anchorEl={anchorEl}
+                            open={Boolean(anchorEl)}
+                            onClose={() => setAnchorEl(null)}
+                        >
+                            <MenuItem 
+                                onClick={() => {
+                                    setSortBy('recent');
+                                    setAnchorEl(null);
+                                }}
+                                selected={sortBy === 'recent'}
+                            >
+                                Most Recent
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => {
+                                    setSortBy('name');
+                                    setAnchorEl(null);
+                                }}
+                                selected={sortBy === 'name'}
+                            >
+                                Name
+                            </MenuItem>
+                            <MenuItem 
+                                onClick={() => {
+                                    setSortBy('department');
+                                    setAnchorEl(null);
+                                }}
+                                selected={sortBy === 'department'}
+                            >
+                                Department
+                            </MenuItem>
+                        </Menu>
 
-            {/* Filter Menu */}
-            <Menu
-                anchorEl={filterAnchorEl}
-                open={Boolean(filterAnchorEl)}
-                onClose={() => setFilterAnchorEl(null)}
-            >
-                <MenuItem 
-                    onClick={() => {
-                        setFilterDepartment('all');
-                        setFilterAnchorEl(null);
-                    }}
-                    selected={filterDepartment === 'all'}
-                >
-                    All Departments
-                </MenuItem>
-                <Divider />
-                {departments.map(dept => (
-                    <MenuItem 
-                        key={dept}
-                        onClick={() => {
-                            setFilterDepartment(dept);
-                            setFilterAnchorEl(null);
-                        }}
-                        selected={filterDepartment === dept}
-                    >
-                        {dept}
-                    </MenuItem>
-                ))}
-            </Menu>
+                        {/* Filter Menu */}
+                        <Menu
+                            anchorEl={filterAnchorEl}
+                            open={Boolean(filterAnchorEl)}
+                            onClose={() => setFilterAnchorEl(null)}
+                        >
+                            <MenuItem 
+                                onClick={() => {
+                                    setFilterDepartment('all');
+                                    setFilterAnchorEl(null);
+                                }}
+                                selected={filterDepartment === 'all'}
+                            >
+                                All Departments
+                            </MenuItem>
+                            <Divider />
+                            {departments.map(dept => (
+                                <MenuItem 
+                                    key={dept}
+                                    onClick={() => {
+                                        setFilterDepartment(dept);
+                                        setFilterAnchorEl(null);
+                                    }}
+                                    selected={filterDepartment === dept}
+                                >
+                                    {dept}
+                                </MenuItem>
+                            ))}
+                        </Menu>
+                    </TabPanel>
+
+                    <TabPanel value={tabValue} index={1}>
+                        <BulkEmployeeUpload />
+                    </TabPanel>
+                </CardContent>
+            </Card>
 
             {/* Delete Confirmation Dialog */}
             <Dialog
