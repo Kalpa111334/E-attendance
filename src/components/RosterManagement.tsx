@@ -50,7 +50,6 @@ interface Employee {
     last_name: string;
     department: string;
     position: string;
-    avatar_url?: string;
 }
 
 // Helper function for date formatting
@@ -112,7 +111,7 @@ const RosterManagement: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('employees')
-                .select('id, employee_id, first_name, last_name, department, position, avatar_url')
+                .select('id, employee_id, first_name, last_name, department, position')
                 .eq('status', 'active')
                 .order('first_name', { ascending: true });
 
@@ -288,8 +287,11 @@ const RosterManagement: React.FC = () => {
                                                         spacing={1}
                                                     >
                                                         <Avatar
-                                                            src={employee?.avatar_url}
-                                                            sx={{ width: 32, height: 32 }}
+                                                            sx={{ 
+                                                                width: 32, 
+                                                                height: 32,
+                                                                background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
+                                                            }}
                                                         >
                                                             {employee?.first_name[0]}
                                                         </Avatar>
