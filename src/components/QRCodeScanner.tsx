@@ -19,12 +19,28 @@ interface QRCodeScannerProps {
     onError?: (error: string) => void;
 }
 
+interface EmployeeQRData {
+    employee_id: string;
+    first_name: string;
+    last_name: string;
+    department: string;
+    position: string;
+    scanUrl?: string;
+    lead?: {
+        employee_id: string;
+        first_name: string;
+        last_name: string;
+        position: string;
+    };
+}
+
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }) => {
     const theme = useTheme();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [facingMode, setFacingMode] = useState<'rear' | 'front'>('rear');
     const [torchEnabled, setTorchEnabled] = useState(false);
+    const [lastScannedData, setLastScannedData] = useState<string | null>(null);
 
     useEffect(() => {
         // Request camera permission on component mount
@@ -36,26 +52,59 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
             });
     }, []);
 
+    const validateEmployeeData = (data: any): data is EmployeeQRData => {
+        return (
+            typeof data === 'object' &&
+            typeof data.employee_id === 'string' &&
+            typeof data.first_name === 'string' &&
+            typeof data.last_name === 'string' &&
+            typeof data.department === 'string' &&
+            typeof data.position === 'string' &&
+            (!data.lead || (
+                typeof data.lead === 'object' &&
+                typeof data.lead.employee_id === 'string' &&
+                typeof data.lead.first_name === 'string' &&
+                typeof data.lead.last_name === 'string' &&
+                typeof data.lead.position === 'string'
+            ))
+        );
+    };
+
     const handleScan = (data: { text: string } | null) => {
-        if (data?.text) {
-            try {
-                const parsedData = JSON.parse(data.text);
-                onScanComplete?.(parsedData);
-            } catch (err) {
-                setError('Invalid QR code format');
-                onError?.('Invalid QR code format');
+        if (!data?.text || data.text === lastScannedData) return;
+
+        try {
+            const parsedData = JSON.parse(data.text);
+            
+            if (!validateEmployeeData(parsedData)) {
+                throw new Error('Invalid employee data format');
             }
+
+            setLastScannedData(data.text);
+            setError(null);
+            onScanComplete?.(parsedData);
+        } catch (err) {
+            if (err instanceof SyntaxError) {
+                setError('Invalid QR code format: Not a valid JSON');
+                onError?.('Invalid QR code format: Not a valid JSON');
+            } else {
+                setError((err as Error).message);
+                onError?.((err as Error).message);
+            }
+            console.error('QR code parsing error:', err);
         }
     };
 
     const handleError = (err: any) => {
-        setError('Failed to access camera');
-        onError?.('Failed to access camera');
+        const errorMessage = err?.message || 'Failed to access camera';
+        setError(errorMessage);
+        onError?.(errorMessage);
         console.error('QR Scanner error:', err);
     };
 
     const toggleCamera = () => {
         setFacingMode(prev => prev === 'rear' ? 'front' : 'rear');
+        setLastScannedData(null); // Reset last scanned data when switching cameras
     };
 
     const toggleTorch = async () => {
@@ -70,6 +119,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
             setTorchEnabled(!torchEnabled);
         } catch (err) {
             console.error('Torch not supported:', err);
+            setError('Torch/flashlight not supported on this device');
         }
     };
 
