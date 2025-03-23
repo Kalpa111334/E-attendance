@@ -33,6 +33,13 @@ interface Employee {
     email: string;
     department: string;
     position: string;
+    lead_id?: string;
+    lead?: {
+        employee_id: string;
+        first_name: string;
+        last_name: string;
+        position: string;
+    };
 }
 
 const DigitalIDCard: React.FC = () => {
@@ -50,7 +57,15 @@ const DigitalIDCard: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('employees')
-                .select('*')
+                .select(`
+                    *,
+                    lead:lead_id (
+                        employee_id,
+                        first_name,
+                        last_name,
+                        position
+                    )
+                `)
                 .order('first_name', { ascending: true });
 
             if (error) throw error;
@@ -68,7 +83,8 @@ const DigitalIDCard: React.FC = () => {
             setProcessingId(employee.id.toString());
             const qrData = JSON.stringify({
                 ...employee,
-                scanUrl: `${window.location.origin}/scan`
+                scanUrl: `${window.location.origin}/scan`,
+                lead: employee.lead || null
             });
 
             const qrUrl = await QRCode.toDataURL(qrData, {
