@@ -81,13 +81,21 @@ const DigitalIDCard: React.FC = () => {
     const generateQRCode = async (employee: Employee) => {
         try {
             setProcessingId(employee.id.toString());
-            const qrData = JSON.stringify({
-                ...employee,
+            
+            // Create a clean data object with only the required fields
+            const qrData = {
+                employee_id: employee.employee_id,
+                first_name: employee.first_name,
+                last_name: employee.last_name,
+                department: employee.department,
+                position: employee.position,
                 scanUrl: `${window.location.origin}/scan`,
                 lead: employee.lead || null
-            });
+            };
 
-            const qrUrl = await QRCode.toDataURL(qrData, {
+            console.log('Generating QR code with data:', qrData); // Debug log
+
+            const qrUrl = await QRCode.toDataURL(JSON.stringify(qrData), {
                 errorCorrectionLevel: 'H',
                 margin: 1,
                 width: 300,

@@ -52,32 +52,29 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
             });
     }, []);
 
-    const validateEmployeeData = (data: any): data is EmployeeQRData => {
-        return (
-            typeof data === 'object' &&
-            typeof data.employee_id === 'string' &&
-            typeof data.first_name === 'string' &&
-            typeof data.last_name === 'string' &&
-            typeof data.department === 'string' &&
-            typeof data.position === 'string' &&
-            (!data.lead || (
-                typeof data.lead === 'object' &&
-                typeof data.lead.employee_id === 'string' &&
-                typeof data.lead.first_name === 'string' &&
-                typeof data.lead.last_name === 'string' &&
-                typeof data.lead.position === 'string'
-            ))
-        );
-    };
-
     const handleScan = (data: { text: string } | null) => {
         if (!data?.text || data.text === lastScannedData) return;
 
+        console.log('Raw QR code data:', data.text); // Debug log
+
         try {
-            const parsedData = JSON.parse(data.text);
+            let parsedData;
+            try {
+                parsedData = JSON.parse(data.text);
+                console.log('Parsed QR code data:', parsedData); // Debug log
+            } catch (parseError) {
+                // Try to handle the case where the data might be double-encoded
+                try {
+                    parsedData = JSON.parse(JSON.parse(data.text));
+                    console.log('Double-parsed QR code data:', parsedData); // Debug log
+                } catch {
+                    throw parseError; // If both attempts fail, throw the original error
+                }
+            }
             
             if (!validateEmployeeData(parsedData)) {
-                throw new Error('Invalid employee data format');
+                console.log('Data validation failed. Missing fields:', Object.keys(parsedData)); // Debug log
+                throw new Error('Invalid employee data format - missing required fields');
             }
 
             setLastScannedData(data.text);
@@ -85,14 +82,47 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
             onScanComplete?.(parsedData);
         } catch (err) {
             if (err instanceof SyntaxError) {
-                setError('Invalid QR code format: Not a valid JSON');
-                onError?.('Invalid QR code format: Not a valid JSON');
+                console.error('JSON parsing error:', err); // Debug log
+                setError('Invalid QR code format: Not a valid JSON. Please regenerate the QR code.');
+                onError?.('Invalid QR code format: Not a valid JSON. Please regenerate the QR code.');
             } else {
+                console.error('Validation error:', err); // Debug log
                 setError((err as Error).message);
                 onError?.((err as Error).message);
             }
-            console.error('QR code parsing error:', err);
         }
+    };
+
+    const validateEmployeeData = (data: any): data is EmployeeQRData => {
+        // Log the validation process
+        console.log('Validating fields:', {
+            hasEmployeeId: typeof data?.employee_id === 'string',
+            hasFirstName: typeof data?.first_name === 'string',
+            hasLastName: typeof data?.last_name === 'string',
+            hasDepartment: typeof data?.department === 'string',
+            hasPosition: typeof data?.position === 'string',
+            hasLead: data?.lead ? typeof data.lead === 'object' : 'optional'
+        });
+
+        const isValid = (
+            typeof data === 'object' &&
+            data !== null &&
+            typeof data.employee_id === 'string' &&
+            typeof data.first_name === 'string' &&
+            typeof data.last_name === 'string' &&
+            typeof data.department === 'string' &&
+            typeof data.position === 'string' &&
+            (!data.lead || (
+                typeof data.lead === 'object' &&
+                data.lead !== null &&
+                typeof data.lead.employee_id === 'string' &&
+                typeof data.lead.first_name === 'string' &&
+                typeof data.lead.last_name === 'string' &&
+                typeof data.lead.position === 'string'
+            ))
+        );
+
+        return isValid;
     };
 
     const handleError = (err: any) => {
