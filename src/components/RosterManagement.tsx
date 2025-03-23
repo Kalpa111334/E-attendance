@@ -112,7 +112,6 @@ const RosterManagement: React.FC = () => {
             const { data, error } = await supabase
                 .from('employees')
                 .select('id, employee_id, first_name, last_name, department, position')
-                .eq('status', 'active')
                 .order('first_name', { ascending: true });
 
             if (error) {
