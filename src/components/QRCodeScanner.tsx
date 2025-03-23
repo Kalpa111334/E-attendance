@@ -42,7 +42,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             const { data: employee, error: employeeError } = await supabase
                 .from('employees')
                 .select('id, employee_id, first_name, last_name, department, position')
-                .eq('employee_id', JSON.parse(data.text).id)
+                .eq('employee_id', data.text)
                 .single();
 
             if (employeeError || !employee) {
