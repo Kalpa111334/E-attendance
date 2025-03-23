@@ -44,6 +44,7 @@ import RosterManagementPage from './pages/RosterManagementPage';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import DigitalIDCard from './pages/DigitalIDCard';
+import PublicQRScanner from './pages/PublicQRScanner';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -363,6 +364,7 @@ const App: React.FC = () => {
                                         <RosterManagementPage />
                                     </ProtectedRoute>
                                 } />
+                                <Route path="/scan" element={<PublicQRScanner />} />
                             </Routes>
                         </React.Suspense>
                     </Box>
