@@ -56,12 +56,13 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 .insert({
                     employee_id: employee.employee_id,
                     scanned_by: user?.id,
-                    scan_time: new Date().toISOString()
+                    location: 'Main Office' // Default location
                 })
                 .select()
                 .single();
 
             if (scanError) {
+                console.error('Scan recording error:', scanError);
                 throw new Error('Failed to record scan');
             }
 
