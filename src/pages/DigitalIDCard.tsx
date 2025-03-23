@@ -83,19 +83,51 @@ const DigitalIDCard: React.FC = () => {
             setProcessingId(employee.id.toString());
             
             // Create a clean data object with only the required fields
-            const qrData = {
-                employee_id: employee.employee_id,
-                first_name: employee.first_name,
-                last_name: employee.last_name,
-                department: employee.department,
-                position: employee.position,
-                scanUrl: `${window.location.origin}/scan`,
-                lead: employee.lead || null
+            const qrData: {
+                employee_id: string;
+                first_name: string;
+                last_name: string;
+                department: string;
+                position: string;
+                scanUrl: string;
+                lead?: {
+                    employee_id: string;
+                    first_name: string;
+                    last_name: string;
+                    position: string;
+                };
+            } = {
+                employee_id: employee.employee_id.trim(),
+                first_name: employee.first_name.trim(),
+                last_name: employee.last_name.trim(),
+                department: employee.department.trim(),
+                position: employee.position.trim(),
+                scanUrl: `${window.location.origin}/scan`.trim()
             };
 
-            console.log('Generating QR code with data:', qrData); // Debug log
+            // Only add lead if it exists and has all required fields
+            if (employee.lead && 
+                employee.lead.employee_id &&
+                employee.lead.first_name &&
+                employee.lead.last_name &&
+                employee.lead.position) {
+                qrData.lead = {
+                    employee_id: employee.lead.employee_id.trim(),
+                    first_name: employee.lead.first_name.trim(),
+                    last_name: employee.lead.last_name.trim(),
+                    position: employee.lead.position.trim()
+                };
+            }
 
-            const qrUrl = await QRCode.toDataURL(JSON.stringify(qrData), {
+            // Convert to JSON string and ensure it's valid
+            const jsonString = JSON.stringify(qrData);
+            // Verify the JSON is valid by parsing it
+            JSON.parse(jsonString);
+
+            console.log('Generating QR code with data:', qrData);
+            console.log('JSON string:', jsonString);
+
+            const qrUrl = await QRCode.toDataURL(jsonString, {
                 errorCorrectionLevel: 'H',
                 margin: 1,
                 width: 300,

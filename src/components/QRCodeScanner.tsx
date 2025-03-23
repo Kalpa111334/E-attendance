@@ -58,60 +58,80 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
         console.log('Raw QR code data:', data.text); // Debug log
 
         try {
+            // Clean up the scanned text
+            const cleanText = data.text.trim();
+            console.log('Cleaned text:', cleanText);
+
+            // Try to parse the JSON
             let parsedData;
             try {
-                parsedData = JSON.parse(data.text);
-                console.log('Parsed QR code data:', parsedData); // Debug log
+                parsedData = JSON.parse(cleanText);
+                console.log('Successfully parsed JSON:', parsedData);
             } catch (parseError) {
-                // Try to handle the case where the data might be double-encoded
+                console.error('Initial JSON parse failed:', parseError);
+                // Try to handle potential encoding issues
                 try {
-                    parsedData = JSON.parse(JSON.parse(data.text));
-                    console.log('Double-parsed QR code data:', parsedData); // Debug log
-                } catch {
+                    // Try decoding as URI component
+                    const decodedText = decodeURIComponent(cleanText);
+                    console.log('URI decoded text:', decodedText);
+                    parsedData = JSON.parse(decodedText);
+                    console.log('Successfully parsed decoded JSON:', parsedData);
+                } catch (decodeError) {
+                    console.error('URI decode failed:', decodeError);
                     throw parseError; // If both attempts fail, throw the original error
                 }
             }
             
+            // Validate the parsed data
+            console.log('Validating parsed data...');
             if (!validateEmployeeData(parsedData)) {
-                console.log('Data validation failed. Missing fields:', Object.keys(parsedData)); // Debug log
+                console.log('Data validation failed. Available fields:', Object.keys(parsedData));
                 throw new Error('Invalid employee data format - missing required fields');
             }
 
-            setLastScannedData(data.text);
+            console.log('Data validation successful');
+            setLastScannedData(cleanText);
             setError(null);
             onScanComplete?.(parsedData);
         } catch (err) {
             if (err instanceof SyntaxError) {
-                console.error('JSON parsing error:', err); // Debug log
-                setError('Invalid QR code format: Not a valid JSON. Please regenerate the QR code.');
-                onError?.('Invalid QR code format: Not a valid JSON. Please regenerate the QR code.');
+                const errorMessage = 'Invalid QR code format: Not a valid JSON. Please regenerate the QR code.';
+                console.error(errorMessage, err);
+                setError(errorMessage);
+                onError?.(errorMessage);
             } else {
-                console.error('Validation error:', err); // Debug log
-                setError((err as Error).message);
-                onError?.((err as Error).message);
+                const errorMessage = (err as Error).message;
+                console.error('Validation error:', errorMessage);
+                setError(errorMessage);
+                onError?.(errorMessage);
             }
         }
     };
 
     const validateEmployeeData = (data: any): data is EmployeeQRData => {
+        if (!data || typeof data !== 'object') {
+            console.log('Data is not an object');
+            return false;
+        }
+
         // Log the validation process
-        console.log('Validating fields:', {
-            hasEmployeeId: typeof data?.employee_id === 'string',
-            hasFirstName: typeof data?.first_name === 'string',
-            hasLastName: typeof data?.last_name === 'string',
-            hasDepartment: typeof data?.department === 'string',
-            hasPosition: typeof data?.position === 'string',
-            hasLead: data?.lead ? typeof data.lead === 'object' : 'optional'
-        });
+        const validation = {
+            hasEmployeeId: typeof data.employee_id === 'string',
+            hasFirstName: typeof data.first_name === 'string',
+            hasLastName: typeof data.last_name === 'string',
+            hasDepartment: typeof data.department === 'string',
+            hasPosition: typeof data.position === 'string',
+            hasLead: data.lead ? typeof data.lead === 'object' : 'optional'
+        };
+
+        console.log('Field validation results:', validation);
 
         const isValid = (
-            typeof data === 'object' &&
-            data !== null &&
-            typeof data.employee_id === 'string' &&
-            typeof data.first_name === 'string' &&
-            typeof data.last_name === 'string' &&
-            typeof data.department === 'string' &&
-            typeof data.position === 'string' &&
+            validation.hasEmployeeId &&
+            validation.hasFirstName &&
+            validation.hasLastName &&
+            validation.hasDepartment &&
+            validation.hasPosition &&
             (!data.lead || (
                 typeof data.lead === 'object' &&
                 data.lead !== null &&
@@ -122,6 +142,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete, onError }
             ))
         );
 
+        console.log('Final validation result:', isValid);
         return isValid;
     };
 
