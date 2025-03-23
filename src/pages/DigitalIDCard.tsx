@@ -58,15 +58,15 @@ const DigitalIDCard: React.FC = () => {
             const { data, error } = await supabase
                 .from('employees')
                 .select(`
-                    *,
-                    lead:lead_id (
-                        employee_id,
-                        first_name,
-                        last_name,
-                        position
-                    )
+                    id,
+                    employee_id,
+                    first_name,
+                    last_name,
+                    email,
+                    department,
+                    position
                 `)
-                .order('first_name', { ascending: true });
+                .order('first_name');
 
             if (error) throw error;
             setEmployees(data || []);
@@ -280,4 +280,4 @@ const DigitalIDCard: React.FC = () => {
     );
 };
 
-export default DigitalIDCard; 
+export default DigitalIDCard;
