@@ -20,7 +20,6 @@ import {
     QrCodeScanner as ScannerIcon,
     Assessment as ReportsIcon,
     Schedule as ScheduleIcon,
-    CreditCard as IDCardIcon,
 } from '@mui/icons-material';
 import { useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
@@ -43,8 +42,6 @@ import { toast } from 'react-toastify';
 import RosterManagementPage from './pages/RosterManagementPage';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import DigitalIDCard from './pages/DigitalIDCard';
-import PublicQRScanner from './pages/PublicQRScanner';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -229,19 +226,6 @@ export const Navigation: React.FC = () => {
                             <Button
                                 color="inherit"
                                 component={Link}
-                                to="/digital-id"
-                                startIcon={<IDCardIcon />}
-                                size="small"
-                                sx={{ 
-                                    fontSize: { xs: '0.875rem', md: '1rem' },
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                Digital ID Cards
-                            </Button>
-                            <Button
-                                color="inherit"
-                                component={Link}
                                 to="/roster"
                                 startIcon={<ScheduleIcon />}
                                 size="small"
@@ -354,17 +338,11 @@ const App: React.FC = () => {
                                         <AttendanceReport />
                                     </ProtectedRoute>
                                 } />
-                                <Route path="/digital-id" element={
-                                    <ProtectedRoute>
-                                        <DigitalIDCard />
-                                    </ProtectedRoute>
-                                } />
                                 <Route path="/roster" element={
                                     <ProtectedRoute>
                                         <RosterManagementPage />
                                     </ProtectedRoute>
                                 } />
-                                <Route path="/scan" element={<PublicQRScanner />} />
                             </Routes>
                         </React.Suspense>
                     </Box>
