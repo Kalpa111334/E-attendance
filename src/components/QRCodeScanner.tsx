@@ -41,11 +41,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             // Verify employee
             const { data: employee, error: employeeError } = await supabase
                 .from('employees')
-                .select('*, departments(name)')
-                .eq('employee_id', data.text)
+                .select('id, employee_id, first_name, last_name, department, position')
+                .eq('employee_id', JSON.parse(data.text).id)
                 .single();
 
             if (employeeError || !employee) {
+                console.error('Employee verification error:', employeeError);
                 throw new Error('Invalid QR code or employee not found');
             }
 
@@ -54,7 +55,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 .from('scans')
                 .insert({
                     employee_id: employee.employee_id,
-                    scanned_by: user?.id
+                    scanned_by: user?.id,
+                    scan_time: new Date().toISOString()
                 })
                 .select()
                 .single();
@@ -128,7 +130,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         // Send WhatsApp notification
                         await sendNotification({
                             employeeName: `${employee.first_name} ${employee.last_name}`,
-                            department: employee.departments.name,
+                            department: employee.department,
                             checkInTime: format(new Date(), 'hh:mm a'),
                             isLate: true
                         });
@@ -290,7 +292,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         ID: {scannedEmployee.employee_id}
                     </Typography>
                     <Typography color="textSecondary" gutterBottom>
-                        Department: {scannedEmployee.departments.name}
+                        Department: {scannedEmployee.department}
                     </Typography>
                     
                     {workingHours && (
