@@ -139,7 +139,7 @@ const EmployeeManagement = () => {
     // Handle employee deletion
     const handleDelete = async () => {
         try {
-            setLoading(true);
+            setProcessingId(selectedEmployee?.id.toString() || '');
             const employeeToDelete = selectedEmployee;
             
             if (!employeeToDelete) {
@@ -160,7 +160,7 @@ const EmployeeManagement = () => {
             const { error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .eq('employee_id', employeeToDelete.employee_id);
+                .eq('id', employeeToDelete.id);
 
             if (employeeError) {
                 throw new Error(`Failed to delete employee: ${employeeError.message}`);
@@ -174,7 +174,7 @@ const EmployeeManagement = () => {
             console.error('Error deleting employee:', error);
             enqueueSnackbar(error instanceof Error ? error.message : 'Failed to delete employee', { variant: 'error' });
         } finally {
-            setLoading(false);
+            setProcessingId(null);
         }
     };
 
