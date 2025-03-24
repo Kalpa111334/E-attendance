@@ -146,7 +146,13 @@ const EmployeeManagement = () => {
                 throw new Error('No employee selected');
             }
 
-            console.log('Attempting to delete employee:', employeeToDelete); // Debug log
+            // Check if we have an authenticated session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+                throw new Error('Authentication required to delete employee');
+            }
+
+            console.log('Attempting to delete employee:', employeeToDelete);
 
             // First delete all related scan records
             const { error: scansError } = await supabase
@@ -159,16 +165,22 @@ const EmployeeManagement = () => {
                 throw new Error(`Failed to delete scan records: ${scansError.message}`);
             }
 
-            // Then delete the employee using only employee_id
+            // Delete the employee
             const { error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .eq('employee_id', employeeToDelete.employee_id)
-                .single();
+                .eq('id', employeeToDelete.id)
+                .eq('employee_id', employeeToDelete.employee_id);
 
             if (employeeError) {
                 console.error('Employee deletion error:', employeeError);
-                throw new Error(`Failed to delete employee: ${employeeError.message}`);
+                if (employeeError.code === 'PGRST116') {
+                    throw new Error('No permission to delete employee');
+                } else if (employeeError.code === '23503') {
+                    throw new Error('Cannot delete employee due to related records');
+                } else {
+                    throw new Error(`Failed to delete employee: ${employeeError.message}`);
+                }
             }
 
             setSelectedEmployee(null);
@@ -181,7 +193,10 @@ const EmployeeManagement = () => {
                 error instanceof Error 
                     ? `Delete failed: ${error.message}` 
                     : 'Failed to delete employee',
-                { variant: 'error' }
+                { 
+                    variant: 'error',
+                    autoHideDuration: 5000
+                }
             );
         } finally {
             setProcessingId(null);
