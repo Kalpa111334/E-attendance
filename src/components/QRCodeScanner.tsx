@@ -211,35 +211,35 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             onError={handleError}
                             onScan={handleScan}
                             facingMode={facingMode}
-                        />
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                height: '2px',
+                                        />
+                                        <Box
+                                            sx={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                    right: 0,
+                                                    height: '2px',
                                 background: theme => `linear-gradient(90deg, 
                                     ${alpha(theme.palette.primary.main, 0)} 0%, 
                                     ${theme.palette.primary.main} 50%, 
                                     ${alpha(theme.palette.primary.main, 0)} 100%)`,
-                                animation: 'scan 2s linear infinite',
-                                '@keyframes scan': {
-                                    '0%': {
+                                                    animation: 'scan 2s linear infinite',
+                                                '@keyframes scan': {
+                                                    '0%': {
                                         transform: 'translateY(-100px)',
                                         opacity: 0
-                                    },
-                                    '50%': {
+                                                    },
+                                                    '50%': {
                                         opacity: 1
-                                    },
-                                    '100%': {
+                                                    },
+                                                    '100%': {
                                         transform: 'translateY(100px)',
                                         opacity: 0
                                     }
                                 }
-                            }}
-                        />
-                    </Box>
+                                            }}
+                                        />
+                                    </Box>
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
                         <Tooltip title="Switch Camera">
                             <IconButton
@@ -319,7 +319,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                    </Typography>
+                                                    </Typography>
                                 </>
                             )}
                         </>
