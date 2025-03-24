@@ -1,15 +1,34 @@
+import React, { useState } from 'react';
+import {
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Icon,
+    SelectChangeEvent
+} from '@mui/material';
 import { DEPARTMENTS, getDepartmentColor, getDepartmentIcon } from '../constants/departments';
 
+interface FormData {
+    department: string;
+    // ... other form fields
+}
+
 const EmployeeForm: React.FC = () => {
-    // ... existing code ...
+    const [formData, setFormData] = useState<FormData>({
+        department: '',
+        // ... other initial values
+    });
 
     return (
-        // ... existing JSX ...
         <FormControl fullWidth required>
             <InputLabel>Department</InputLabel>
             <Select
                 value={formData.department}
-                onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                onChange={(e: SelectChangeEvent) => setFormData(prev => ({ 
+                    ...prev, 
+                    department: e.target.value 
+                }))}
                 label="Department"
             >
                 {DEPARTMENTS.map((dept) => (
@@ -30,7 +49,6 @@ const EmployeeForm: React.FC = () => {
                 ))}
             </Select>
         </FormControl>
-        // ... rest of JSX ...
     );
 };
 
