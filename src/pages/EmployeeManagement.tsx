@@ -146,46 +146,43 @@ const EmployeeManagement = () => {
                 throw new Error('No employee selected');
             }
 
-            console.log('Deleting employee:', employeeToDelete); // Debug log
+            console.log('Attempting to delete employee:', employeeToDelete); // Debug log
 
             // First delete all related scan records
-            const { data: deletedScans, error: scansError } = await supabase
+            const { error: scansError } = await supabase
                 .from('scans')
                 .delete()
-                .eq('employee_id', employeeToDelete.employee_id)
-                .select();
+                .eq('employee_id', employeeToDelete.employee_id);
 
             if (scansError) {
-                console.error('Scan deletion error:', scansError); // Debug log
+                console.error('Scan deletion error:', scansError);
                 throw new Error(`Failed to delete scan records: ${scansError.message}`);
             }
 
-            console.log('Deleted scans:', deletedScans); // Debug log
-
-            // Then delete the employee using both id and employee_id
-            const { data: deletedEmployee, error: employeeError } = await supabase
+            // Then delete the employee using only employee_id
+            const { error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .match({
-                    id: employeeToDelete.id,
-                    employee_id: employeeToDelete.employee_id
-                })
-                .select();
+                .eq('employee_id', employeeToDelete.employee_id)
+                .single();
 
             if (employeeError) {
-                console.error('Employee deletion error:', employeeError); // Debug log
+                console.error('Employee deletion error:', employeeError);
                 throw new Error(`Failed to delete employee: ${employeeError.message}`);
             }
-
-            console.log('Deleted employee:', deletedEmployee); // Debug log
 
             setSelectedEmployee(null);
             setIsDeleteDialogOpen(false);
             await fetchEmployees();
             enqueueSnackbar('Employee deleted successfully', { variant: 'success' });
         } catch (error) {
-            console.error('Error deleting employee:', error);
-            enqueueSnackbar(error instanceof Error ? error.message : 'Failed to delete employee', { variant: 'error' });
+            console.error('Error in deletion process:', error);
+            enqueueSnackbar(
+                error instanceof Error 
+                    ? `Delete failed: ${error.message}` 
+                    : 'Failed to delete employee',
+                { variant: 'error' }
+            );
         } finally {
             setProcessingId(null);
         }
