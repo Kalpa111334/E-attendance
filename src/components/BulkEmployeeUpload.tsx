@@ -63,6 +63,17 @@ const DEPARTMENTS = [
     'Research & Development'
 ];
 
+const VALID_DEPARTMENTS = [
+    'Administration',
+    'Human Resources',
+    'Finance',
+    'IT',
+    'Operations',
+    'Transport Section',
+    'Marketing',
+    'Sales'
+];
+
 // Employee type definitions
 interface EmployeeData {
     first_name: string;
@@ -83,6 +94,10 @@ interface PreviewData extends EmployeeData {
     errors: string[];
     [key: string]: any; // Allow additional properties from CSV/Excel
 }
+
+const validateDepartment = (department: string) => {
+    return VALID_DEPARTMENTS.includes(department);
+};
 
 const BulkEmployeeUpload: React.FC = () => {
     const [processing, setProcessing] = useState(false);
@@ -147,8 +162,8 @@ const BulkEmployeeUpload: React.FC = () => {
         // Validate department against predefined list
         if (!employee.department) {
             errors.push('Department is required');
-        } else if (!DEPARTMENTS.includes(employee.department)) {
-            errors.push(`Invalid department. Must be one of: ${DEPARTMENTS.join(', ')}`);
+        } else if (!validateDepartment(employee.department)) {
+            errors.push(`Invalid department. Must be one of: ${VALID_DEPARTMENTS.join(', ')}`);
         }
 
         return {
