@@ -1,53 +1,62 @@
 export const DEPARTMENTS = [
     'Administration',
     'Human Resources',
+    'Information Technology',
     'Finance',
-    'IT',
     'Operations',
-    'Transport Section',
     'Marketing',
-    'Sales'
+    'Sales',
+    'Transport Section'
 ] as const;
 
 export type Department = typeof DEPARTMENTS[number];
 
-export const isDepartment = (value: string): value is Department => {
+export function isDepartment(value: any): value is Department {
     return DEPARTMENTS.includes(value as Department);
-};
+}
 
-export const getDepartmentColor = (department: Department) => {
-    const colors = {
-        'Administration': '#1976d2',
-        'Human Resources': '#388e3c',
-        'Finance': '#d32f2f',
-        'IT': '#7b1fa2',
-        'Operations': '#f57c00',
-        'Transport Section': '#0288d1',
-        'Marketing': '#c2185b',
-        'Sales': '#00796b'
-    };
-    return colors[department] || '#757575';
-};
-
-export const getDepartmentIcon = (department: Department) => {
+export function getDepartmentColor(department: Department): string {
     switch (department) {
+        case 'Administration':
+            return '#2196F3';  // Blue
+        case 'Human Resources':
+            return '#4CAF50';  // Green
+        case 'Information Technology':
+            return '#9C27B0';  // Purple
+        case 'Finance':
+            return '#FF9800';  // Orange
+        case 'Operations':
+            return '#F44336';  // Red
+        case 'Marketing':
+            return '#00BCD4';  // Cyan
+        case 'Sales':
+            return '#795548';  // Brown
         case 'Transport Section':
-            return 'directions_bus';
+            return '#607D8B';  // Blue Grey
+        default:
+            return '#757575';  // Grey
+    }
+}
+
+export function getDepartmentIcon(department: Department): string {
+    switch (department) {
         case 'Administration':
             return 'admin_panel_settings';
         case 'Human Resources':
             return 'people';
+        case 'Information Technology':
+            return 'computer';
         case 'Finance':
             return 'attach_money';
-        case 'IT':
-            return 'computer';
         case 'Operations':
             return 'build';
         case 'Marketing':
             return 'campaign';
         case 'Sales':
-            return 'store';
+            return 'shopping_cart';
+        case 'Transport Section':
+            return 'local_shipping';
         default:
-            return 'work';
+            return 'business';
     }
-}; 
+} 
