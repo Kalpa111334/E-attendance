@@ -157,53 +157,76 @@ const BulkEmployeeUpload: React.FC = () => {
     const processFile = async (file: File): Promise<PreviewData[]> => {
         const previewData: PreviewData[] = [];
         
-        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-            const reader = new FileReader();
-            const data = await new Promise<string | ArrayBuffer>((resolve, reject) => {
-                reader.onload = (e) => resolve(e.target?.result || '');
-                reader.onerror = (e) => reject(e);
-                reader.readAsBinaryString(file);
-            });
-
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-            for (const row of jsonData) {
-                const { employee, errors } = validateEmployeeData([row]);
-                if (employee) {
-                    previewData.push({
-                        ...employee,
-                        isValid: errors.length === 0,
-                        errors,
-                    });
-                }
-            }
-        } else if (file.name.endsWith('.csv')) {
-            const results = await new Promise<Papa.ParseResult<any>>((resolve) => {
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: resolve,
-                    error: reject => {
-                        reject(new Error('Invalid CSV format'));
-                    }
+        try {
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                const reader = new FileReader();
+                const data = await new Promise<string | ArrayBuffer>((resolve, reject) => {
+                    reader.onload = (e) => resolve(e.target?.result || '');
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsBinaryString(file);
                 });
-            });
 
-            for (const row of results.data) {
-                const { employee, errors } = validateEmployeeData([row]);
-                if (employee) {
-                    previewData.push({
-                        ...employee,
-                        isValid: errors.length === 0,
-                        errors,
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                for (const row of jsonData) {
+                    try {
+                        const validData = validateEmployeeData([row as Record<string, unknown>]);
+                        previewData.push({
+                            ...validData[0],
+                            isValid: true,
+                            errors: []
+                        });
+                    } catch (error) {
+                        const typedRow = row as Record<string, unknown>;
+                        previewData.push({
+                            first_name: String(typedRow.first_name || ''),
+                            last_name: String(typedRow.last_name || ''),
+                            email: String(typedRow.email || ''),
+                            department: String(typedRow.department || ''),
+                            position: String(typedRow.position || ''),
+                            isValid: false,
+                            errors: (error as Error).message.split('\n')
+                        });
+                    }
+                }
+            } else if (file.name.endsWith('.csv')) {
+                const results = await new Promise<Papa.ParseResult<Record<string, unknown>>>((resolve, reject) => {
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: resolve,
+                        error: () => reject(new Error('Invalid CSV format'))
                     });
+                });
+
+                for (const row of results.data) {
+                    try {
+                        const validData = validateEmployeeData([row]);
+                        previewData.push({
+                            ...validData[0],
+                            isValid: true,
+                            errors: []
+                        });
+                    } catch (error) {
+                        previewData.push({
+                            first_name: String(row.first_name || ''),
+                            last_name: String(row.last_name || ''),
+                            email: String(row.email || ''),
+                            department: String(row.department || ''),
+                            position: String(row.position || ''),
+                            isValid: false,
+                            errors: (error as Error).message.split('\n')
+                        });
+                    }
                 }
             }
-        }
 
-        return previewData;
+            return previewData;
+        } catch (error) {
+            throw new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     };
 
     const handleUpload = async (file: File) => {
@@ -518,7 +541,53 @@ const BulkEmployeeUpload: React.FC = () => {
                     <Button
                         variant="contained"
                         startIcon={<SaveIcon />}
-                        onClick={() => setShowPreview(true)}
+                        onClick={async () => {
+                            try {
+                                const validData = previewData
+                                    .filter(data => data.isValid)
+                                    .map(({ first_name, last_name, email, department, position }) => ({
+                                        first_name,
+                                        last_name,
+                                        email,
+                                        department,
+                                        position
+                                    }));
+                                
+                                const results = await uploadEmployees(validData);
+                                setResults(results);
+
+                                // Generate summary
+                                const summary = {
+                                    total: previewData.length,
+                                    success: results.filter(r => r.success).length,
+                                    failed: results.filter(r => !r.success).length,
+                                    departments: {} as Record<string, number>,
+                                };
+
+                                results.forEach(result => {
+                                    if (result.success) {
+                                        const dept = result.employee.department;
+                                        summary.departments[dept] = (summary.departments[dept] || 0) + 1;
+                                    }
+                                });
+
+                                setUploadSummary(summary);
+                                setShowPreview(false);
+
+                                if (summary.success > 0) {
+                                    enqueueSnackbar(`Successfully uploaded ${summary.success} employees`, {
+                                        variant: 'success'
+                                    });
+                                }
+                                if (summary.failed > 0) {
+                                    enqueueSnackbar(`Failed to upload ${summary.failed} employees`, {
+                                        variant: 'error'
+                                    });
+                                }
+                            } catch (error) {
+                                enqueueSnackbar('Failed to upload employees', { variant: 'error' });
+                            }
+                        }}
                         disabled={!previewData.some(d => d.isValid)}
                         sx={{
                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
