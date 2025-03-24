@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box, Grid, Card, CardContent, Typography, TextField,
     Button, IconButton, Avatar, Chip, Tooltip,
@@ -26,6 +26,7 @@ import QRCode from 'qrcode';
 import BulkEmployeeUpload from '../components/BulkEmployeeUpload';
 import RosterManagement from '../components/RosterManagement';
 import { useSnackbar } from 'notistack';
+import { debounce } from 'lodash';
 
 interface Employee {
     id: number;
@@ -38,6 +39,8 @@ interface Employee {
     avatar_url?: string;
     status: 'active' | 'inactive';
     created_at: string;
+    scans?: Array<{ id: number; created_at: string }>;
+    scan_count?: number;
 }
 
 interface TabPanelProps {
@@ -92,16 +95,34 @@ const EmployeeManagement = () => {
     const fetchEmployees = async () => {
         try {
             setLoading(true);
-            const { data, error: supabaseError } = await supabase
+            const { data, error: fetchError } = await supabase
                 .from('employees')
-                .select('*')
+                .select(`
+                    *,
+                    scans (
+                        id,
+                        created_at
+                    )
+                `)
                 .order('created_at', { ascending: false });
 
-            if (supabaseError) throw supabaseError;
-            setEmployees(data || []);
+            if (fetchError) throw fetchError;
+
+            // Transform data to include scan count
+            const employeesWithMetadata = data?.map(emp => ({
+                ...emp,
+                scan_count: emp.scans?.length || 0
+            })) || [];
+
+            setEmployees(employeesWithMetadata);
+            setError(null);
         } catch (err) {
+            console.error('Error fetching employees:', err);
             setError('Failed to fetch employees');
-            console.error(err);
+            enqueueSnackbar('Failed to load employees', { 
+                variant: 'error',
+                autoHideDuration: 5000 
+            });
         } finally {
             setLoading(false);
         }
@@ -145,42 +166,20 @@ const EmployeeManagement = () => {
 
             setProcessingId(selectedEmployee.id.toString());
 
-            // First try to delete scans
-            const { error: scansError } = await supabase
-                .from('scans')
-                .delete()
-                .eq('employee_id', selectedEmployee.employee_id);
+            // Delete employee and related records in a transaction
+            const { data, error } = await supabase.rpc('delete_employee_with_records', {
+                p_employee_id: selectedEmployee.employee_id
+            });
 
-            if (scansError) {
-                console.error('Error deleting scans:', scansError);
-                // Continue with employee deletion even if scan deletion fails
+            if (error) {
+                console.error('Delete error:', error);
+                throw new Error(error.message || 'Failed to delete employee');
             }
 
-            // Try to delete the employee directly
-            const { data, error: deleteError } = await supabase
-                .from('employees')
-                .delete()
-                .match({ id: selectedEmployee.id })
-                .select()
-                .single();
-
-            if (deleteError) {
-                console.error('Delete error:', deleteError);
-                
-                // Check for specific error types
-                if (deleteError.message?.includes('foreign key')) {
-                    throw new Error('Cannot delete employee - please remove related records first');
-                } else if (deleteError.message?.includes('permission')) {
-                    throw new Error('You do not have permission to delete employees');
-                } else {
-                    throw new Error(deleteError.message || 'Failed to delete employee');
-                }
-            }
-
-            // Success path
+            // Optimistic update - remove from local state immediately
+            setEmployees(prev => prev.filter(emp => emp.id !== selectedEmployee.id));
             setSelectedEmployee(null);
             setIsDeleteDialogOpen(false);
-            await fetchEmployees(); // Refresh the list
             enqueueSnackbar('Employee deleted successfully', { 
                 variant: 'success',
                 autoHideDuration: 3000 
@@ -192,6 +191,8 @@ const EmployeeManagement = () => {
                 error instanceof Error ? error.message : 'Failed to delete employee',
                 { variant: 'error', autoHideDuration: 5000 }
             );
+            // Refresh the list in case of error to ensure consistency
+            await fetchEmployees();
         } finally {
             setProcessingId(null);
         }
@@ -227,6 +228,75 @@ const EmployeeManagement = () => {
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
+    };
+
+    // Add debounced search
+    const debouncedSearch = useCallback(
+        debounce((term: string) => {
+            setSearchTerm(term);
+        }, 300),
+        []
+    );
+
+    // Add bulk delete functionality
+    const handleBulkDelete = async (selectedIds: number[]) => {
+        try {
+            setLoading(true);
+            const { error } = await supabase.rpc('delete_multiple_employees', {
+                p_employee_ids: selectedIds
+            });
+
+            if (error) throw error;
+
+            // Optimistic update
+            setEmployees(prev => prev.filter(emp => !selectedIds.includes(emp.id)));
+            enqueueSnackbar(`Successfully deleted ${selectedIds.length} employees`, {
+                variant: 'success'
+            });
+        } catch (err) {
+            console.error('Bulk delete error:', err);
+            enqueueSnackbar('Failed to delete selected employees', { 
+                variant: 'error' 
+            });
+            await fetchEmployees(); // Refresh on error
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Add export functionality
+    const handleExport = async () => {
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('employees')
+                .select('*')
+                .csv();
+
+            if (error) throw error;
+
+            // Create and download CSV file
+            const blob = new Blob([data], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `employees_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            enqueueSnackbar('Employee data exported successfully', {
+                variant: 'success'
+            });
+        } catch (err) {
+            console.error('Export error:', err);
+            enqueueSnackbar('Failed to export employee data', { 
+                variant: 'error' 
+            });
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
