@@ -24,6 +24,7 @@
     "jspdf": "^3.0.0",
     "jspdf-autotable": "^5.0.2",
     "jszip": "^3.10.1",
+    "notistack": "^3.0.2",
     "papaparse": "^5.5.2",
     "qrcode": "^1.5.3",
     "qrcode.react": "^3.1.0",

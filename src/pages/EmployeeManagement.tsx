@@ -25,6 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import BulkEmployeeUpload from '../components/BulkEmployeeUpload';
 import RosterManagement from '../components/RosterManagement';
+import { useSnackbar } from 'notistack';
 
 interface Employee {
     id: number;
@@ -81,6 +82,7 @@ const EmployeeManagement = () => {
 
     const theme = useTheme();
     const navigate = useNavigate();
+    const { enqueueSnackbar } = useSnackbar();
 
     // Fetch employees
     useEffect(() => {
@@ -136,23 +138,43 @@ const EmployeeManagement = () => {
 
     // Handle employee deletion
     const handleDelete = async () => {
-        if (!selectedEmployee) return;
-
         try {
-            setProcessingId(selectedEmployee.id.toString());
-            const { error } = await supabase
+            setLoading(true);
+            const employeeToDelete = selectedEmployee;
+            
+            if (!employeeToDelete) {
+                throw new Error('No employee selected');
+            }
+
+            // First delete all related scan records
+            const { error: scansError } = await supabase
+                .from('scans')
+                .delete()
+                .eq('employee_id', employeeToDelete.employee_id);
+
+            if (scansError) {
+                throw new Error(`Failed to delete scan records: ${scansError.message}`);
+            }
+
+            // Then delete the employee
+            const { error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .eq('id', selectedEmployee.id);
+                .eq('employee_id', employeeToDelete.employee_id);
 
-            if (error) throw error;
-            await fetchEmployees();
-            setIsDeleteDialogOpen(false);
+            if (employeeError) {
+                throw new Error(`Failed to delete employee: ${employeeError.message}`);
+            }
+
             setSelectedEmployee(null);
-        } catch (err) {
-            setError('Failed to delete employee');
+            setIsDeleteDialogOpen(false);
+            await fetchEmployees();
+            enqueueSnackbar('Employee deleted successfully', { variant: 'success' });
+        } catch (error) {
+            console.error('Error deleting employee:', error);
+            enqueueSnackbar(error instanceof Error ? error.message : 'Failed to delete employee', { variant: 'error' });
         } finally {
-            setProcessingId(null);
+            setLoading(false);
         }
     };
 
