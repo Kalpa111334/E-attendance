@@ -146,25 +146,38 @@ const EmployeeManagement = () => {
                 throw new Error('No employee selected');
             }
 
+            console.log('Deleting employee:', employeeToDelete); // Debug log
+
             // First delete all related scan records
-            const { error: scansError } = await supabase
+            const { data: deletedScans, error: scansError } = await supabase
                 .from('scans')
                 .delete()
-                .eq('employee_id', employeeToDelete.employee_id);
+                .eq('employee_id', employeeToDelete.employee_id)
+                .select();
 
             if (scansError) {
+                console.error('Scan deletion error:', scansError); // Debug log
                 throw new Error(`Failed to delete scan records: ${scansError.message}`);
             }
 
-            // Then delete the employee
-            const { error: employeeError } = await supabase
+            console.log('Deleted scans:', deletedScans); // Debug log
+
+            // Then delete the employee using both id and employee_id
+            const { data: deletedEmployee, error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .eq('id', employeeToDelete.id);
+                .match({
+                    id: employeeToDelete.id,
+                    employee_id: employeeToDelete.employee_id
+                })
+                .select();
 
             if (employeeError) {
+                console.error('Employee deletion error:', employeeError); // Debug log
                 throw new Error(`Failed to delete employee: ${employeeError.message}`);
             }
+
+            console.log('Deleted employee:', deletedEmployee); // Debug log
 
             setSelectedEmployee(null);
             setIsDeleteDialogOpen(false);
