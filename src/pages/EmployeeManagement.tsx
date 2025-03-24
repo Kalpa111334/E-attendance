@@ -154,39 +154,56 @@ const EmployeeManagement = () => {
 
             console.log('Attempting to delete employee:', employeeToDelete);
 
-            // First delete all related scan records
-            const { error: scansError } = await supabase
+            // Check for any related records in the scans table
+            const { data: relatedScans, error: scanCheckError } = await supabase
                 .from('scans')
-                .delete()
+                .select('id')
                 .eq('employee_id', employeeToDelete.employee_id);
 
-            if (scansError) {
-                console.error('Scan deletion error:', scansError);
-                throw new Error(`Failed to delete scan records: ${scansError.message}`);
+            if (scanCheckError) {
+                console.error('Error checking related scans:', scanCheckError);
+                throw new Error(`Failed to check related records: ${scanCheckError.message}`);
             }
 
-            // Delete the employee
+            // If there are related scans, delete them first
+            if (relatedScans && relatedScans.length > 0) {
+                const { error: scansError } = await supabase
+                    .from('scans')
+                    .delete()
+                    .eq('employee_id', employeeToDelete.employee_id);
+
+                if (scansError) {
+                    console.error('Scan deletion error:', scansError);
+                    throw new Error(`Failed to delete scan records: ${scansError.message}`);
+                }
+                console.log(`Deleted ${relatedScans.length} related scan records`);
+            }
+
+            // Delete the employee with a simpler query
             const { error: employeeError } = await supabase
                 .from('employees')
                 .delete()
-                .eq('id', employeeToDelete.id)
                 .eq('employee_id', employeeToDelete.employee_id);
 
             if (employeeError) {
                 console.error('Employee deletion error:', employeeError);
                 if (employeeError.code === 'PGRST116') {
-                    throw new Error('No permission to delete employee');
+                    throw new Error('No permission to delete employee. Please check your access rights.');
                 } else if (employeeError.code === '23503') {
-                    throw new Error('Cannot delete employee due to related records');
+                    throw new Error('Cannot delete employee. Please ensure all related records are removed first.');
                 } else {
                     throw new Error(`Failed to delete employee: ${employeeError.message}`);
                 }
             }
 
+            console.log('Employee deleted successfully:', employeeToDelete.employee_id);
             setSelectedEmployee(null);
             setIsDeleteDialogOpen(false);
             await fetchEmployees();
-            enqueueSnackbar('Employee deleted successfully', { variant: 'success' });
+            enqueueSnackbar('Employee deleted successfully', { 
+                variant: 'success',
+                autoHideDuration: 3000
+            });
         } catch (error) {
             console.error('Error in deletion process:', error);
             enqueueSnackbar(
