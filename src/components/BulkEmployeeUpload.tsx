@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     Box,
     Card,
@@ -48,22 +48,10 @@ import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { toast } from 'react-toastify';
+import { useDropzone } from 'react-dropzone';
+import { DEPARTMENTS, isDepartment } from '../constants/departments';
+import { useSnackbar } from 'notistack';
 
-// Add departments constant
-const DEPARTMENTS = [
-    'IT',
-    'HR',
-    'Finance',
-    'Marketing',
-    'Operations',
-    'Sales',
-    'Engineering',
-    'Customer Support',
-    'Legal',
-    'Research & Development'
-];
-
-// Employee type definitions
 interface EmployeeData {
     first_name: string;
     last_name: string;
@@ -97,6 +85,7 @@ const BulkEmployeeUpload: React.FC = () => {
         departments: Record<string, number>;
     } | null>(null);
     const theme = useTheme();
+    const { enqueueSnackbar } = useSnackbar();
 
     const downloadTemplate = () => {
         const template = XLSX.utils.book_new();
@@ -121,40 +110,48 @@ const BulkEmployeeUpload: React.FC = () => {
         XLSX.writeFile(template, 'employee_upload_template.xlsx');
     };
 
-    const validateEmployeeData = (data: any): { employee: EmployeeData | null; errors: string[] } => {
+    const validateEmployeeData = (data: any[]): EmployeeData[] => {
+        const validData: EmployeeData[] = [];
         const errors: string[] = [];
-        const employee: EmployeeData = {
-            first_name: data.first_name || data['First Name'] || '',
-            last_name: data.last_name || data['Last Name'] || '',
-            email: data.email || data['Email'] || '',
-            department: data.department || data['Department'] || '',
-            position: data.position || data['Position'] || '',
-        };
 
-        // Validate required fields
-        if (!employee.first_name) errors.push('First name is required');
-        if (!employee.last_name) errors.push('Last name is required');
-        if (!employee.position) errors.push('Position is required');
+        data.forEach((row, index) => {
+            // Skip empty rows
+            if (!row.first_name && !row.last_name && !row.email && !row.department && !row.position) {
+                return;
+            }
 
-        // Validate email format
-        const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-        if (!employee.email) {
-            errors.push('Email is required');
-        } else if (!emailRegex.test(employee.email)) {
-            errors.push('Invalid email format');
+            // Validate required fields
+            if (!row.first_name || !row.last_name || !row.email || !row.department || !row.position) {
+                errors.push(`Row ${index + 1}: Missing required fields`);
+                return;
+            }
+
+            // Validate email format
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) {
+                errors.push(`Row ${index + 1}: Invalid email format`);
+                return;
+            }
+
+            // Validate department
+            if (!isDepartment(row.department)) {
+                errors.push(`Row ${index + 1}: Invalid department. Must be one of: ${DEPARTMENTS.join(', ')}`);
+                return;
+            }
+
+            validData.push({
+                first_name: row.first_name.trim(),
+                last_name: row.last_name.trim(),
+                email: row.email.trim().toLowerCase(),
+                department: row.department.trim(),
+                position: row.position.trim()
+            });
+        });
+
+        if (errors.length > 0) {
+            throw new Error('Validation errors:\n' + errors.join('\n'));
         }
 
-        // Validate department against predefined list
-        if (!employee.department) {
-            errors.push('Department is required');
-        } else if (!DEPARTMENTS.includes(employee.department)) {
-            errors.push(`Invalid department. Must be one of: ${DEPARTMENTS.join(', ')}`);
-        }
-
-        return {
-            employee: errors.length === 0 ? employee : null,
-            errors
-        };
+        return validData;
     };
 
     const processFile = async (file: File): Promise<PreviewData[]> => {
@@ -173,7 +170,7 @@ const BulkEmployeeUpload: React.FC = () => {
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
             for (const row of jsonData) {
-                const { employee, errors } = validateEmployeeData(row);
+                const { employee, errors } = validateEmployeeData([row]);
                 if (employee) {
                     previewData.push({
                         ...employee,
@@ -186,12 +183,16 @@ const BulkEmployeeUpload: React.FC = () => {
             const results = await new Promise<Papa.ParseResult<any>>((resolve) => {
                 Papa.parse(file, {
                     header: true,
+                    skipEmptyLines: true,
                     complete: resolve,
+                    error: reject => {
+                        reject(new Error('Invalid CSV format'));
+                    }
                 });
             });
 
             for (const row of results.data) {
-                const { employee, errors } = validateEmployeeData(row);
+                const { employee, errors } = validateEmployeeData([row]);
                 if (employee) {
                     previewData.push({
                         ...employee,
@@ -205,50 +206,25 @@ const BulkEmployeeUpload: React.FC = () => {
         return previewData;
     };
 
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setProcessing(true);
-        setError(null);
-        setResults([]);
-        setPreviewData([]);
-        setUploadSummary(null);
-
+    const handleUpload = async (file: File) => {
         try {
+            setProcessing(true);
+            setError(null);
+            setResults([]);
+            setPreviewData([]);
+            setUploadSummary(null);
+
             const preview = await processFile(file);
             setPreviewData(preview);
             setShowPreview(true);
-        } catch (error: any) {
-            setError(error.message);
-            toast.error('Failed to process file');
-        } finally {
-            setProcessing(false);
-        }
-    };
 
-    const handleConfirmUpload = async () => {
-        setProcessing(true);
-        setError(null);
-        setResults([]);
-
-        try {
-            const validEmployees = previewData
-                .filter(data => data.isValid)
-                .map(({ first_name, last_name, email, department, position }) => ({
-                    first_name,
-                    last_name,
-                    email,
-                    department,
-                    position,
-                }));
-
-            const results = await uploadEmployees(validEmployees);
+            const validData = preview.filter(data => data.isValid).map(data => data.employee);
+            const results = await uploadEmployees(validData);
             setResults(results);
 
             // Generate summary
             const summary = {
-                total: previewData.length,
+                total: preview.length,
                 success: results.filter(r => r.success).length,
                 failed: results.filter(r => !r.success).length,
                 departments: {} as Record<string, number>,
@@ -265,14 +241,18 @@ const BulkEmployeeUpload: React.FC = () => {
             setShowPreview(false);
 
             if (summary.success > 0) {
-                toast.success(`Successfully added ${summary.success} employees`);
+                enqueueSnackbar(`Successfully uploaded ${summary.success} employees`, {
+                    variant: 'success'
+                });
             }
             if (summary.failed > 0) {
-                toast.error(`Failed to add ${summary.failed} employees`);
+                enqueueSnackbar(`Failed to upload ${summary.failed} employees`, {
+                    variant: 'error'
+                });
             }
         } catch (error: any) {
-            setError(error.message);
-            toast.error('Failed to upload employees');
+            setError(error.message || 'Failed to upload employees');
+            toast.error(error.message || 'Failed to upload employees');
         } finally {
             setProcessing(false);
         }
@@ -338,6 +318,20 @@ const BulkEmployeeUpload: React.FC = () => {
         return results;
     };
 
+    const onDrop = useCallback((acceptedFiles: File[]) => {
+        if (acceptedFiles.length === 0) return;
+        handleUpload(acceptedFiles[0]);
+    }, []);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'text/csv': ['.csv']
+        },
+        maxFiles: 1,
+        disabled: processing
+    });
+
     return (
         <Box sx={{ maxWidth: 800, mx: 'auto', mt: 4, p: 2 }}>
             <Card
@@ -372,51 +366,34 @@ const BulkEmployeeUpload: React.FC = () => {
                             <CardContent>
                                 <Stack spacing={2}>
                                     <Box
+                                        {...getRootProps()}
                                         sx={{
                                             border: '2px dashed',
-                                            borderColor: 'divider',
+                                            borderColor: isDragActive ? 'primary.main' : 'grey.300',
                                             borderRadius: 2,
                                             p: 3,
                                             textAlign: 'center',
-                                            cursor: 'pointer',
+                                            cursor: processing ? 'not-allowed' : 'pointer',
+                                            bgcolor: isDragActive ? 'action.hover' : 'background.paper',
                                             '&:hover': {
-                                                borderColor: 'primary.main',
-                                                bgcolor: alpha(theme.palette.primary.main, 0.05),
-                                            },
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            const file = e.dataTransfer.files[0];
-                                            if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv'))) {
-                                                const input = document.createElement('input');
-                                                const dataTransfer = new DataTransfer();
-                                                dataTransfer.items.add(file);
-                                                input.files = dataTransfer.files;
-                                                handleFileUpload({ target: input } as React.ChangeEvent<HTMLInputElement>);
-                                            } else {
-                                                toast.error('Please upload an XLSX or CSV file');
+                                                bgcolor: 'action.hover'
                                             }
                                         }}
-                                        onDragOver={(e) => e.preventDefault()}
                                     >
-                                        <input
-                                            type="file"
-                                            accept=".xlsx,.xls,.csv"
-                                            onChange={handleFileUpload}
-                                            style={{ display: 'none' }}
-                                            id="file-upload"
-                                        />
-                                        <label htmlFor="file-upload">
-                                            <Stack spacing={1} alignItems="center">
-                                                <UploadIcon color="primary" sx={{ fontSize: 40 }} />
-                                                <Typography variant="h6">
-                                                    Drag & Drop or Click to Upload
-                                                </Typography>
-                                                <Typography variant="body2" color="textSecondary">
-                                                    Supported formats: XLSX, XLS, CSV
-                                                </Typography>
-                                            </Stack>
-                                        </label>
+                                        <input {...getInputProps()} />
+                                        <UploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
+                                        <Typography variant="h6" gutterBottom>
+                                            {isDragActive ? 'Drop the CSV file here' : 'Drag & drop a CSV file here'}
+                                        </Typography>
+                                        <Typography variant="body2" color="textSecondary">
+                                            or click to select a file
+                                        </Typography>
+                                        {processing && (
+                                            <CircularProgress 
+                                                size={24}
+                                                sx={{ mt: 2 }}
+                                            />
+                                        )}
                                     </Box>
 
                                     <Stack direction="row" spacing={2} justifyContent="center">
@@ -433,12 +410,6 @@ const BulkEmployeeUpload: React.FC = () => {
                                         <Alert severity="error" sx={{ mt: 2 }}>
                                             {error}
                                         </Alert>
-                                    )}
-
-                                    {processing && (
-                                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                                            <CircularProgress />
-                                        </Box>
                                     )}
 
                                     {results.length > 0 && (
@@ -547,7 +518,7 @@ const BulkEmployeeUpload: React.FC = () => {
                     <Button
                         variant="contained"
                         startIcon={<SaveIcon />}
-                        onClick={handleConfirmUpload}
+                        onClick={() => setShowPreview(true)}
                         disabled={!previewData.some(d => d.isValid)}
                         sx={{
                             background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
