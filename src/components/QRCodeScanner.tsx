@@ -204,10 +204,11 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         try {
             setIsFlipping(true);
             setCameraError(null);
+            const newMode = facingMode === 'environment' ? 'user' : 'environment';
             setKey(prev => prev + 1);
-            setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+            setFacingMode(newMode);
             
-            enqueueSnackbar('Camera switched', { 
+            enqueueSnackbar(`Switched to ${newMode === 'user' ? 'Front' : 'Back'} Camera`, { 
                 variant: 'success',
                 autoHideDuration: 2000
             });
@@ -221,7 +222,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         } finally {
             setIsFlipping(false);
         }
-    }, [enqueueSnackbar]);
+    }, [enqueueSnackbar, facingMode]);
 
     // Add effect to handle camera errors
     useEffect(() => {
@@ -253,8 +254,26 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             onScan={(result) => result && handleScan({ text: result.text })}
                             facingMode={facingMode}
                             delay={1000}
-                            style={{ width: '100%' }}
+                            style={{ 
+                                width: '100%',
+                                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+                            }}
                         />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                position: 'absolute',
+                                top: 16,
+                                left: 16,
+                                background: 'rgba(0, 0, 0, 0.6)',
+                                color: 'white',
+                                padding: '4px 8px',
+                                borderRadius: 1,
+                                fontSize: '0.875rem'
+                            }}
+                        >
+                            {facingMode === 'user' ? 'Front Camera' : 'Back Camera'}
+                        </Typography>
                         <Box
                             sx={{
                                 position: 'absolute',
@@ -283,8 +302,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             }}
                         />
                     </Box>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-                        <Tooltip title="Switch Camera">
+                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2, alignItems: 'center' }}>
+                        <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
                             <IconButton
                                 onClick={handleSwitchCamera}
                                 disabled={isFlipping}
@@ -292,6 +311,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     background: theme => alpha(theme.palette.primary.main, 0.1),
                                     '&:hover': {
                                         background: theme => alpha(theme.palette.primary.main, 0.2)
+                                    },
+                                    '&:disabled': {
+                                        opacity: 0.5
                                     }
                                 }}
                             >
@@ -302,6 +324,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                 )}
                             </IconButton>
                         </Tooltip>
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                color: theme => alpha(theme.palette.text.primary, 0.7)
+                            }}
+                        >
+                            {isFlipping ? 'Switching...' : `Click to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}
+                        </Typography>
                     </Box>
                     {cameraError && (
                         <Alert 
