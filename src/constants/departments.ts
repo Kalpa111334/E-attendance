@@ -17,6 +17,6 @@ export const DEPARTMENTS = [
 
 export type Department = typeof DEPARTMENTS[number];
 
-export const isDepartment = (value: string): value is Department => {
-    return DEPARTMENTS.includes(value as Department);
+export const isDepartment = (value: unknown): value is Department => {
+    return typeof value === 'string' && DEPARTMENTS.includes(value as Department);
 }; 

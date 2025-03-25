@@ -31,6 +31,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [showResult, setShowResult] = useState(false);
     const [workingHours, setWorkingHours] = useState<WorkingHoursRecord | null>(null);
     const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [isFlipping, setIsFlipping] = useState(false);
     const { enqueueSnackbar } = useSnackbar();
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
@@ -172,8 +174,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     }, [loading, onResult, onError, onScanComplete, user?.id]);
 
     const handleError = useCallback((err: Error) => {
-        setError(`Scanner error: ${err.message}`);
-        onError?.(`Scanner error: ${err.message}`);
+        setError(err.message);
+        onError?.(err.message);
     }, [onError]);
 
     const handleReset = () => {
@@ -184,10 +186,40 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         setWorkingHours(null);
     };
 
-    const handleSwitchCamera = () => {
-        setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
-        enqueueSnackbar('Camera flipped', { variant: 'info', autoHideDuration: 1000 });
-    };
+    const handleSwitchCamera = useCallback(async () => {
+        try {
+            setIsFlipping(true);
+            setCameraError(null);
+            // Stop current stream
+            const tracks = document.querySelectorAll('video')[0]?.srcObject as MediaStream;
+            tracks?.getTracks().forEach(track => track.stop());
+            
+            // Switch camera
+            setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+            
+            enqueueSnackbar('Camera switched', { 
+                variant: 'success',
+                autoHideDuration: 2000
+            });
+        } catch (err) {
+            console.error('Camera switch error:', err);
+            setCameraError('Failed to switch camera. Please try again.');
+            enqueueSnackbar('Failed to switch camera', { 
+                variant: 'error',
+                autoHideDuration: 3000
+            });
+        } finally {
+            setIsFlipping(false);
+        }
+    }, [enqueueSnackbar]);
+
+    // Add effect to handle camera errors
+    useEffect(() => {
+        if (cameraError) {
+            const timer = setTimeout(() => setCameraError(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [cameraError]);
 
     return (
         <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
@@ -211,39 +243,41 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             onError={handleError}
                             onScan={handleScan}
                             facingMode={facingMode}
-                                        />
-                                        <Box
-                                            sx={{
-                                                    position: 'absolute',
-                                                    top: 0,
-                                                    left: 0,
-                                                    right: 0,
-                                                    height: '2px',
+                            key={facingMode} // Force remount when camera changes
+                        />
+                        <Box
+                            sx={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    height: '2px',
                                 background: theme => `linear-gradient(90deg, 
                                     ${alpha(theme.palette.primary.main, 0)} 0%, 
                                     ${theme.palette.primary.main} 50%, 
                                     ${alpha(theme.palette.primary.main, 0)} 100%)`,
-                                                    animation: 'scan 2s linear infinite',
-                                                '@keyframes scan': {
-                                                    '0%': {
+                                animation: 'scan 2s linear infinite',
+                                '@keyframes scan': {
+                                    '0%': {
                                         transform: 'translateY(-100px)',
                                         opacity: 0
-                                                    },
-                                                    '50%': {
+                                    },
+                                    '50%': {
                                         opacity: 1
-                                                    },
-                                                    '100%': {
+                                    },
+                                    '100%': {
                                         transform: 'translateY(100px)',
                                         opacity: 0
                                     }
                                 }
-                                            }}
-                                        />
-                                    </Box>
+                            }}
+                        />
+                    </Box>
                     <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
                         <Tooltip title="Switch Camera">
                             <IconButton
                                 onClick={handleSwitchCamera}
+                                disabled={isFlipping}
                                 sx={{
                                     background: theme => alpha(theme.palette.primary.main, 0.1),
                                     '&:hover': {
@@ -251,10 +285,23 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     }
                                 }}
                             >
-                                <FlipCameraIcon />
+                                {isFlipping ? (
+                                    <CircularProgress size={24} />
+                                ) : (
+                                    <FlipCameraIcon />
+                                )}
                             </IconButton>
                         </Tooltip>
                     </Box>
+                    {cameraError && (
+                        <Alert 
+                            severity="error" 
+                            sx={{ mt: 2 }}
+                            onClose={() => setCameraError(null)}
+                        >
+                            {cameraError}
+                        </Alert>
+                    )}
                 </Paper>
             ) : null}
 
