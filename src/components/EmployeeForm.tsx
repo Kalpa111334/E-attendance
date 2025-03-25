@@ -27,29 +27,17 @@ interface EmployeeFormProps {
 const DEPARTMENTS = [
     'Dutch Activity',
     'Kitchen',
-    'Food and Beverage Department',
+    'Food & Beverage Department',
     'Butchery',
     'Operations',
-    'Reservation',
     'Maintenance',
+    'Reservations',
     'House Keeping',
     'Pastry Kitchen',
     'Stores',
     'Purchasing & Stores',
     'Accounts Department',
-    'Human Resources',
-    'Engineering',
-    'Marketing',
-    'Sales',
-    'Finance',
-    'Customer Support',
-    'Research & Development',
-    'Midiz (IT)',
-    'Dutch Trails',
-    'Divron Hatchery',
-    'Divron Office',
-    'Tropical Selfish',
-    'Corporate Office'
+    'IT'
 ];
 
 const POSITIONS = [
