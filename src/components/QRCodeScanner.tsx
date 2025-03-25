@@ -21,6 +21,18 @@ interface WorkingHoursRecord {
     is_late: boolean;
 }
 
+interface QrScannerProps {
+    onError?: (error: Error) => void;
+    onScan?: (result: { text: string }) => void;
+    facingMode?: 'user' | 'environment';
+    delay?: number;
+    style?: React.CSSProperties;
+}
+
+interface ScanResult {
+    data: string;
+}
+
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScanComplete }) => {
     const theme = useTheme();
     const { user } = useAuth();
@@ -33,6 +45,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isFlipping, setIsFlipping] = useState(false);
+    const [key, setKey] = useState(0);
     const { enqueueSnackbar } = useSnackbar();
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
@@ -165,9 +178,10 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             setShowResult(true);
             setScanning(false);
 
-        } catch (err: any) {
-            setError(err.message);
-            onError?.(err.message);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            setError(errorMessage);
+            onError?.(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -190,11 +204,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         try {
             setIsFlipping(true);
             setCameraError(null);
-            // Stop current stream
-            const tracks = document.querySelectorAll('video')[0]?.srcObject as MediaStream;
-            tracks?.getTracks().forEach(track => track.stop());
-            
-            // Switch camera
+            setKey(prev => prev + 1);
             setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
             
             enqueueSnackbar('Camera switched', { 
@@ -238,20 +248,20 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                 >
                     <Box sx={{ position: 'relative' }}>
                         <QrScanner
+                            key={key}
+                            onError={handleError}
+                            onScan={(result) => result && handleScan({ text: result.text })}
+                            facingMode={facingMode}
                             delay={1000}
                             style={{ width: '100%' }}
-                            onError={handleError}
-                            onScan={handleScan}
-                            facingMode={facingMode}
-                            key={facingMode} // Force remount when camera changes
                         />
                         <Box
                             sx={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: '2px',
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                height: '2px',
                                 background: theme => `linear-gradient(90deg, 
                                     ${alpha(theme.palette.primary.main, 0)} 0%, 
                                     ${theme.palette.primary.main} 50%, 
@@ -366,7 +376,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                                    </Typography>
+                                    </Typography>
                                 </>
                             )}
                         </>

@@ -284,19 +284,19 @@ export const sendNotification = async (params: NotificationParams): Promise<bool
         // Determine message template based on notification type
         let message: string;
         try {
-            if (params.isAttendanceReport && params.customMessage) {
-                message = MESSAGE_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
-            } else if (params.isLate && params.checkInTime) {
+        if (params.isAttendanceReport && params.customMessage) {
+            message = MESSAGE_TEMPLATES.ATTENDANCE_REPORT(params.customMessage);
+        } else if (params.isLate && params.checkInTime) {
                 message = MESSAGE_TEMPLATES.LATE_CHECK_IN(params.employeeName, params.checkInTime, params.department || '');
-            } else if (params.isAbsent) {
+        } else if (params.isAbsent) {
                 message = MESSAGE_TEMPLATES.ABSENT(params.employeeName, params.department || '');
-            } else if (params.isEarlyLeave && params.checkOutTime) {
+        } else if (params.isEarlyLeave && params.checkOutTime) {
                 message = MESSAGE_TEMPLATES.EARLY_LEAVE(params.employeeName, params.checkOutTime, params.department || '');
-            } else if (params.overtimeHours !== undefined) {
+        } else if (params.overtimeHours !== undefined) {
                 message = MESSAGE_TEMPLATES.OVERTIME(params.employeeName, params.overtimeHours, params.department || '');
-            } else if (params.customMessage) {
-                message = params.customMessage;
-            } else {
+        } else if (params.customMessage) {
+            message = params.customMessage;
+        } else {
                 throw new Error('Invalid notification type or missing required parameters');
             }
         } catch (error) {

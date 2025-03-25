@@ -12,7 +12,17 @@ export const DEPARTMENTS = [
     'Administration',
     'Transport',
     'Maintenance',
-    'Security'
+    'Security',
+    'Dutch Activity',
+    'Kitchen',
+    'Food & Beverage Department',
+    'Butchery',
+    'Reservations',
+    'House Keeping',
+    'Pastry Kitchen',
+    'Stores',
+    'Purchasing & Stores',
+    'Accounts Department'
 ] as const;
 
 export type Department = typeof DEPARTMENTS[number];
