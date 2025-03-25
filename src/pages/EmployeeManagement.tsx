@@ -27,6 +27,7 @@ import BulkEmployeeUpload from '../components/BulkEmployeeUpload';
 import RosterManagement from '../components/RosterManagement';
 import { useSnackbar } from 'notistack';
 import { debounce } from 'lodash';
+import UniversalQRCode from '../components/UniversalQRCode';
 
 interface Employee {
     id: number;

@@ -42,6 +42,7 @@ import { toast } from 'react-toastify';
 import RosterManagementPage from './pages/RosterManagementPage';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import MarkAttendance from './pages/MarkAttendance';
 
 export const Footer: React.FC = () => {
     const location = useLocation();
@@ -343,6 +344,7 @@ const App: React.FC = () => {
                                         <RosterManagementPage />
                                     </ProtectedRoute>
                                 } />
+                                <Route path="/mark-attendance/:employeeId" element={<MarkAttendance />} />
                             </Routes>
                         </React.Suspense>
                     </Box>
