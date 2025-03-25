@@ -204,14 +204,28 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         try {
             setIsFlipping(true);
             setCameraError(null);
+
+            // Stop current video stream if any
+            const videoElement = document.querySelector('video');
+            if (videoElement && videoElement.srcObject) {
+                const stream = videoElement.srcObject as MediaStream;
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Switch camera mode
             const newMode = facingMode === 'environment' ? 'user' : 'environment';
-            setKey(prev => prev + 1);
             setFacingMode(newMode);
             
+            // Force QR scanner remount
+            setKey(prev => prev + 1);
+
             enqueueSnackbar(`Switched to ${newMode === 'user' ? 'Front' : 'Back'} Camera`, { 
                 variant: 'success',
                 autoHideDuration: 2000
             });
+
+            // Small delay to ensure camera switch is complete
+            await new Promise(resolve => setTimeout(resolve, 500));
         } catch (err) {
             console.error('Camera switch error:', err);
             setCameraError('Failed to switch camera. Please try again.');
@@ -256,53 +270,40 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             delay={1000}
                             style={{ 
                                 width: '100%',
-                                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none'
+                                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                                transition: 'transform 0.3s ease'
                             }}
                         />
-                        <Typography
-                            variant="caption"
+                        <Box
                             sx={{
                                 position: 'absolute',
                                 top: 16,
                                 left: 16,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
                                 background: 'rgba(0, 0, 0, 0.6)',
                                 color: 'white',
-                                padding: '4px 8px',
-                                borderRadius: 1,
-                                fontSize: '0.875rem'
+                                padding: '8px 12px',
+                                borderRadius: 2,
+                                backdropFilter: 'blur(4px)'
                             }}
                         >
-                            {facingMode === 'user' ? 'Front Camera' : 'Back Camera'}
-                        </Typography>
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                height: '2px',
-                                background: theme => `linear-gradient(90deg, 
-                                    ${alpha(theme.palette.primary.main, 0)} 0%, 
-                                    ${theme.palette.primary.main} 50%, 
-                                    ${alpha(theme.palette.primary.main, 0)} 100%)`,
-                                animation: 'scan 2s linear infinite',
-                                '@keyframes scan': {
-                                    '0%': {
-                                        transform: 'translateY(-100px)',
-                                        opacity: 0
-                                    },
-                                    '50%': {
-                                        opacity: 1
-                                    },
-                                    '100%': {
-                                        transform: 'translateY(100px)',
-                                        opacity: 0
-                                    }
-                                }
-                            }}
-                        />
+                            <FlipCameraIcon sx={{ fontSize: 20 }} />
+                            <Typography variant="caption" sx={{ fontSize: '0.875rem' }}>
+                                {facingMode === 'user' ? 'Front Camera' : 'Back Camera'}
+                            </Typography>
+                        </Box>
                     </Box>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2, alignItems: 'center' }}>
+                    <Box 
+                        sx={{ 
+                            mt: 2, 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            alignItems: 'center', 
+                            gap: 1 
+                        }}
+                    >
                         <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
                             <IconButton
                                 onClick={handleSwitchCamera}
@@ -310,11 +311,13 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                 sx={{
                                     background: theme => alpha(theme.palette.primary.main, 0.1),
                                     '&:hover': {
-                                        background: theme => alpha(theme.palette.primary.main, 0.2)
+                                        background: theme => alpha(theme.palette.primary.main, 0.2),
+                                        transform: 'scale(1.05)'
                                     },
                                     '&:disabled': {
                                         opacity: 0.5
-                                    }
+                                    },
+                                    transition: 'all 0.2s ease'
                                 }}
                             >
                                 {isFlipping ? (
@@ -327,16 +330,32 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         <Typography
                             variant="body2"
                             sx={{
-                                color: theme => alpha(theme.palette.text.primary, 0.7)
+                                color: theme => alpha(theme.palette.text.primary, 0.7),
+                                textAlign: 'center'
                             }}
                         >
-                            {isFlipping ? 'Switching...' : `Click to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}
+                            {isFlipping ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <CircularProgress size={16} />
+                                    Switching camera...
+                                </Box>
+                            ) : (
+                                `Tap to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`
+                            )}
                         </Typography>
                     </Box>
                     {cameraError && (
                         <Alert 
                             severity="error" 
-                            sx={{ mt: 2 }}
+                            sx={{ 
+                                mt: 2,
+                                borderRadius: 2,
+                                animation: 'slideIn 0.3s ease-out',
+                                '@keyframes slideIn': {
+                                    from: { transform: 'translateY(-20px)', opacity: 0 },
+                                    to: { transform: 'translateY(0)', opacity: 1 }
+                                }
+                            }}
                             onClose={() => setCameraError(null)}
                         >
                             {cameraError}
@@ -406,7 +425,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                     </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                    </Typography>
+                                                    </Typography>
                                 </>
                             )}
                         </>
