@@ -47,6 +47,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [isFlipping, setIsFlipping] = useState(false);
     const [key, setKey] = useState(0);
     const { enqueueSnackbar } = useSnackbar();
+    const [cameraAvailable, setCameraAvailable] = useState(true);
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
         if (!data?.text || loading) return;
@@ -205,46 +206,63 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             setIsFlipping(true);
             setCameraError(null);
 
-            // Stop current video stream if any
+            // Stop current video stream
             const videoElement = document.querySelector('video');
-            if (videoElement && videoElement.srcObject) {
+            if (videoElement?.srcObject) {
                 const stream = videoElement.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
+            }
+
+            // Check camera availability
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            if (videoDevices.length < 2) {
+                throw new Error('Multiple cameras not available on this device');
             }
 
             // Switch camera mode
             const newMode = facingMode === 'environment' ? 'user' : 'environment';
             setFacingMode(newMode);
-            
-            // Force QR scanner remount
-            setKey(prev => prev + 1);
+            setKey(prev => prev + 1); // Force QR scanner remount
 
-            enqueueSnackbar(`Switched to ${newMode === 'user' ? 'Front' : 'Back'} Camera`, { 
+            enqueueSnackbar(`Switched to ${newMode === 'user' ? 'Front' : 'Back'} Camera`, {
                 variant: 'success',
                 autoHideDuration: 2000
             });
 
-            // Small delay to ensure camera switch is complete
+            // Allow camera initialization
             await new Promise(resolve => setTimeout(resolve, 500));
+
         } catch (err) {
             console.error('Camera switch error:', err);
-            setCameraError('Failed to switch camera. Please try again.');
-            enqueueSnackbar('Failed to switch camera', { 
+            const errorMessage = err instanceof Error ? err.message : 'Failed to switch camera';
+            setCameraError(errorMessage);
+            enqueueSnackbar(errorMessage, {
                 variant: 'error',
                 autoHideDuration: 3000
             });
+            setCameraAvailable(false);
         } finally {
             setIsFlipping(false);
         }
     }, [enqueueSnackbar, facingMode]);
 
-    // Add effect to handle camera errors
+    // Check camera availability on mount
     useEffect(() => {
-        if (cameraError) {
-            const timer = setTimeout(() => setCameraError(null), 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [cameraError]);
+        const checkCameras = async () => {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                setCameraAvailable(videoDevices.length > 1);
+            } catch (err) {
+                console.error('Error checking cameras:', err);
+                setCameraAvailable(false);
+            }
+        };
+
+        checkCameras();
+    }, []);
 
     return (
         <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
@@ -269,24 +287,29 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             facingMode={facingMode}
                             delay={1000}
                             style={{ 
-                                                width: '100%', 
+                                width: '100%', 
                                 transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
                                 transition: 'transform 0.3s ease'
-                                            }}
-                                        />
-                                        <Box
-                                            sx={{
-                                                position: 'absolute',
+                            }}
+                        />
+                        <Box
+                            sx={{
+                                position: 'absolute',
                                 top: 16,
                                 left: 16,
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
                                 background: 'rgba(0, 0, 0, 0.6)',
                                 color: 'white',
                                 padding: '8px 12px',
                                 borderRadius: 2,
-                                backdropFilter: 'blur(4px)'
+                                backdropFilter: 'blur(4px)',
+                                animation: 'fadeIn 0.3s ease-out',
+                                '@keyframes fadeIn': {
+                                    from: { opacity: 0, transform: 'translateY(-10px)' },
+                                    to: { opacity: 1, transform: 'translateY(0)' }
+                                }
                             }}
                         >
                             <FlipCameraIcon sx={{ fontSize: 20 }} />
@@ -295,61 +318,56 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             </Typography>
                         </Box>
                     </Box>
-                    <Box 
-                        sx={{ 
-                            mt: 2, 
-                            display: 'flex', 
-                            flexDirection: 'column',
-                            alignItems: 'center', 
-                            gap: 1 
-                        }}
-                    >
-                        <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
-                    <IconButton 
-                                onClick={handleSwitchCamera}
-                                disabled={isFlipping}
-                        sx={{
-                                    background: theme => alpha(theme.palette.primary.main, 0.1),
-                            '&:hover': {
-                                        background: theme => alpha(theme.palette.primary.main, 0.2),
-                                        transform: 'scale(1.05)'
-                                    },
-                                    '&:disabled': {
-                                        opacity: 0.5
-                                    },
-                                    transition: 'all 0.2s ease'
+                    {cameraAvailable && (
+                        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                            <Tooltip title={isFlipping ? 'Switching...' : `Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
+                                <IconButton
+                                    onClick={handleSwitchCamera}
+                                    disabled={isFlipping}
+                                    sx={{
+                                        background: theme => alpha(theme.palette.primary.main, 0.1),
+                                        '&:hover': {
+                                            background: theme => alpha(theme.palette.primary.main, 0.2),
+                                            transform: 'scale(1.05)'
+                                        },
+                                        '&:disabled': {
+                                            opacity: 0.5
+                                        },
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    {isFlipping ? (
+                                        <CircularProgress size={24} />
+                                    ) : (
+                                        <FlipCameraIcon />
+                                    )}
+                                </IconButton>
+                            </Tooltip>
+                                <Typography 
+                                variant="body2"
+                                    sx={{
+                                    color: theme => alpha(theme.palette.text.primary, 0.7),
+                                    textAlign: 'center',
+                                    minHeight: 24
                                 }}
                             >
                                 {isFlipping ? (
-                                    <CircularProgress size={24} />
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <CircularProgress size={16} />
+                                        Switching camera...
+                                    </Box>
                                 ) : (
-                                    <FlipCameraIcon />
+                                    `Tap to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`
                                 )}
-                    </IconButton>
-                        </Tooltip>
-                                    <Typography 
-                            variant="body2"
-                                        sx={{
-                                color: theme => alpha(theme.palette.text.primary, 0.7),
-                                textAlign: 'center'
-                            }}
-                        >
-                            {isFlipping ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <CircularProgress size={16} />
-                                    Switching camera...
-                                </Box>
-                            ) : (
-                                `Tap to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`
-                            )}
-                        </Typography>
-                    </Box>
+                                </Typography>
+                            </Box>
+                    )}
                     {cameraError && (
-                        <Alert 
-                            severity="error" 
-                                            sx={{ 
+                                    <Alert 
+                                        severity="error"
+                                        sx={{ 
                                 mt: 2,
-                                borderRadius: 2,
+                                            borderRadius: 2,
                                 animation: 'slideIn 0.3s ease-out',
                                 '@keyframes slideIn': {
                                     from: { transform: 'translateY(-20px)', opacity: 0 },
@@ -359,15 +377,15 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             onClose={() => setCameraError(null)}
                         >
                             {cameraError}
-                        </Alert>
-                    )}
+                                    </Alert>
+                            )}
                 </Paper>
             ) : null}
 
-            {loading && (
+                            {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                     <CircularProgress />
-                </Box>
+                                    </Box>
             )}
 
             {error && (
@@ -384,9 +402,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             )}
 
             {showResult && scannedEmployee && (
-                                        <Paper 
+                <Paper 
                     elevation={0}
-                                            sx={{ 
+                    sx={{ 
                         p: 3, 
                         mt: 2,
                         borderRadius: 4,
@@ -415,14 +433,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                 {workingHours.is_late && (
                                     <Typography component="span" color="error" sx={{ ml: 1 }}>
                                         (Late)
-                                                    </Typography>
+                                    </Typography>
                                 )}
-                                                    </Typography>
+                            </Typography>
                             {workingHours.check_out && (
                                 <>
                                     <Typography color="textSecondary">
                                         Check-out: {format(new Date(workingHours.check_out), 'hh:mm a')}
-                                                    </Typography>
+                                    </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
                                                     </Typography>

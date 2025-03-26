@@ -65,6 +65,8 @@ const EmployeeList: React.FC = () => {
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     const navigate = useNavigate();
     const theme = useTheme();
@@ -150,6 +152,27 @@ const EmployeeList: React.FC = () => {
         }
     };
 
+    const handleDeleteAllEmployees = async () => {
+        try {
+            setIsDeletingAll(true);
+            const { error } = await supabase
+                .from('employees')
+                .delete()
+                .neq('id', ''); // Delete all records
+
+            if (error) throw error;
+
+            toast.success('All employees deleted successfully');
+            await fetchEmployees();
+            setDeleteAllDialogOpen(false);
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to delete employees');
+        } finally {
+            setIsDeletingAll(false);
+        }
+    };
+
     const filteredEmployees = employees.filter(employee => {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = 
@@ -170,7 +193,7 @@ const EmployeeList: React.FC = () => {
                 ${alpha(theme.palette.secondary.light, 0.15)} 50%,
                 ${alpha(theme.palette.primary.light, 0.15)} 100%)`,
             position: 'relative',
-            p: { xs: 2, md: 4 },
+            p: { xs: 1, sm: 2, md: 4 },
             overflow: 'hidden',
             '&::before': {
                 content: '""',
@@ -195,6 +218,7 @@ const EmployeeList: React.FC = () => {
             <Card sx={{
                 maxWidth: 1200,
                 margin: '0 auto',
+                width: '100%',
                 backdropFilter: 'blur(10px)',
                 background: alpha(theme.palette.background.paper, 0.8),
                 borderRadius: 4,
@@ -220,28 +244,60 @@ const EmployeeList: React.FC = () => {
                     borderRadius: '4px 4px 0 0',
                 },
             }}>
-                <CardContent sx={{ p: { xs: 2, md: 4 } }}>
+                <CardContent sx={{ 
+                    p: { xs: 1, sm: 2, md: 4 }
+                }}>
                     <Stack 
-                        direction="row" 
+                        direction={{ xs: 'column', sm: 'row' }}
                         justifyContent="space-between" 
-                        alignItems="center" 
+                        alignItems={{ xs: 'stretch', sm: 'center' }}
+                        spacing={{ xs: 2, sm: 0 }}
                         sx={{ mb: 3 }}
                     >
-                        <Typography variant="h5" component="h1">
+                        <Typography 
+                            variant="h5" 
+                            component="h1"
+                            sx={{ 
+                                fontSize: { xs: '1.25rem', sm: '1.5rem' }
+                            }}
+                        >
                             Employee List ({filteredEmployees.length})
                         </Typography>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => navigate('/employees/new')}
+                        <Stack 
+                            direction={{ xs: 'column', sm: 'row' }} 
+                            spacing={{ xs: 1, sm: 2 }}
+                            width={{ xs: '100%', sm: 'auto' }}
                         >
-                            Add Employee
-                        </Button>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                color="error"
+                                startIcon={<DeleteIcon />}
+                                onClick={() => setDeleteAllDialogOpen(true)}
+                                disabled={employees.length === 0}
+                                sx={{ 
+                                    minWidth: { xs: '100%', sm: 120 }
+                                }}
+                            >
+                                Delete All
+                            </Button>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                startIcon={<AddIcon />}
+                                onClick={() => navigate('/employees/new')}
+                                sx={{ 
+                                    minWidth: { xs: '100%', sm: 120 }
+                                }}
+                            >
+                                Add Employee
+                            </Button>
+                        </Stack>
                     </Stack>
 
                     <Stack 
                         direction={{ xs: 'column', sm: 'row' }} 
-                        spacing={2} 
+                        spacing={{ xs: 2, sm: 2 }} 
                         sx={{ mb: 3 }}
                     >
                         <TextField
@@ -258,7 +314,12 @@ const EmployeeList: React.FC = () => {
                                 ),
                             }}
                         />
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <FormControl 
+                            size="small" 
+                            sx={{ 
+                                minWidth: { xs: '100%', sm: 200 }
+                            }}
+                        >
                             <InputLabel>Department</InputLabel>
                             <Select
                                 value={department}
@@ -277,10 +338,10 @@ const EmployeeList: React.FC = () => {
                         component={Paper}
                         sx={{
                             borderRadius: 2,
-                            boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.08)}`,
-                            background: alpha(theme.palette.background.paper, 0.9),
-                            backdropFilter: 'blur(10px)',
-                            overflow: 'hidden',
+                            overflow: 'auto',
+                            '& .MuiTable-root': {
+                                minWidth: 800,
+                            },
                             '& .MuiTableHead-root': {
                                 background: `linear-gradient(45deg, 
                                     ${alpha(theme.palette.primary.main, 0.05)},
@@ -295,11 +356,11 @@ const EmployeeList: React.FC = () => {
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Email</TableCell>
-                                    <TableCell>Department</TableCell>
-                                    <TableCell>Position</TableCell>
-                                    <TableCell>Employee ID</TableCell>
+                                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Name</TableCell>
+                                    <TableCell>ID</TableCell>
+                                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
+                                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Department</TableCell>
+                                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Position</TableCell>
                                     <TableCell align="center">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -319,11 +380,14 @@ const EmployeeList: React.FC = () => {
                                 ) : (
                                     filteredEmployees.map((employee) => (
                                         <TableRow key={employee.id}>
-                                            <TableCell>
+                                            <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                                                 {employee.first_name} {employee.last_name}
                                             </TableCell>
-                                            <TableCell>{employee.email}</TableCell>
-                                            <TableCell>
+                                            <TableCell>{employee.employee_id}</TableCell>
+                                            <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
+                                                {employee.email}
+                                            </TableCell>
+                                            <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>
                                                 <Chip 
                                                     label={employee.department} 
                                                     size="small"
@@ -331,12 +395,13 @@ const EmployeeList: React.FC = () => {
                                                     variant="outlined"
                                                 />
                                             </TableCell>
-                                            <TableCell>{employee.position}</TableCell>
-                                            <TableCell>{employee.employee_id}</TableCell>
+                                            <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>
+                                                {employee.position}
+                                            </TableCell>
                                             <TableCell>
                                                 <Stack 
                                                     direction="row" 
-                                                    spacing={1} 
+                                                    spacing={{ xs: 0.5, sm: 1 }}
                                                     justifyContent="center"
                                                 >
                                                     <Tooltip title="Download QR Code">
@@ -428,6 +493,49 @@ const EmployeeList: React.FC = () => {
                         disabled={!!processingId}
                     >
                         {processingId ? <CircularProgress size={20} /> : 'Delete'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={deleteAllDialogOpen}
+                onClose={() => setDeleteAllDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        backdropFilter: 'blur(20px)',
+                        background: alpha(theme.palette.background.paper, 0.9),
+                        boxShadow: `
+                            0 4px 6px ${alpha(theme.palette.error.main, 0.1)},
+                            0 10px 40px ${alpha(theme.palette.error.main, 0.2)}
+                        `,
+                        border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
+                    }
+                }}
+            >
+                <DialogTitle>Delete All Employees</DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ mb: 2 }}>
+                        Are you sure you want to delete all {employees.length} employees? This action cannot be undone.
+                    </Typography>
+                    <Alert severity="warning">
+                        This will permanently delete all employee records and their associated data.
+                    </Alert>
+                </DialogContent>
+                <DialogActions>
+                    <Button 
+                        onClick={() => setDeleteAllDialogOpen(false)}
+                        disabled={isDeletingAll}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleDeleteAllEmployees}
+                        color="error"
+                        variant="contained"
+                        disabled={isDeletingAll}
+                    >
+                        {isDeletingAll ? <CircularProgress size={20} /> : 'Delete All'}
                     </Button>
                 </DialogActions>
             </Dialog>
