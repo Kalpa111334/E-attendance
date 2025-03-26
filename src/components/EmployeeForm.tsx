@@ -41,7 +41,7 @@ const departmentOptions = [
     'transport',
     'security',
     'human_resources'
-];
+] as const;
 
 const POSITIONS = [
     'Manager',
@@ -68,7 +68,7 @@ const initialFormData: EmployeeFormData = {
 const formatDepartmentName = (dept: string) => {
     return dept
         .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .map(word => word === 'dt' ? 'DT' : word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 };
 
