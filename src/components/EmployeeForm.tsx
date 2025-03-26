@@ -25,7 +25,7 @@ interface EmployeeFormProps {
 }
 
 const DEPARTMENTS = [
-    'Dutch Activity',
+    'DT Activity',
     'Kitchen',
     'Food & Beverage Department',
     'Butchery',
@@ -38,8 +38,9 @@ const DEPARTMENTS = [
     'Purchasing & Stores',
     'Accounts Department',
     'IT',
-    'Transport',
-    'Security',
+    'Transport Section',
+    'Security Department',
+    'Human Resources',
 ];
 
 const POSITIONS = [
