@@ -37,7 +37,9 @@ const DEPARTMENTS = [
     'Stores',
     'Purchasing & Stores',
     'Accounts Department',
-    'IT'
+    'IT',
+    'Transport',
+    'Security',
 ];
 
 const POSITIONS = [
