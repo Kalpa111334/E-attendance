@@ -1,17 +1,18 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme, IconButton, Tooltip, Button, Fade, Zoom, Stack } from '@mui/material';
 import QrScanner from 'react-qr-scanner';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { sendNotification } from '../utils/whatsappNotification';
-import { FlipCameraIos as FlipCameraIcon } from '@mui/icons-material';
+import { FlipCameraIos as FlipCameraIcon, Brightness6 as BrightnessIcon, PhotoCamera as CameraIcon, RestartAlt as RestartIcon, QrCode2 as QrCodeIcon } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 
 interface QRCodeScannerProps {
     onResult?: (result: string) => void;
     onError?: (error: string) => void;
     onScanComplete?: (employee: any) => void;
+    initialFacingMode?: 'user' | 'environment';
 }
 
 interface WorkingHoursRecord {
@@ -33,7 +34,12 @@ interface ScanResult {
     data: string;
 }
 
-const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScanComplete }) => {
+const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ 
+    onResult, 
+    onError, 
+    onScanComplete,
+    initialFacingMode = 'environment'
+}) => {
     const theme = useTheme();
     const { user } = useAuth();
     const [scanning, setScanning] = useState(true);
@@ -48,6 +54,11 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     const [key, setKey] = useState(0);
     const { enqueueSnackbar } = useSnackbar();
     const [cameraAvailable, setCameraAvailable] = useState(true);
+    const [torchEnabled, setTorchEnabled] = useState(false);
+    const [hasTorch, setHasTorch] = useState(false);
+    const [scannerReady, setScannerReady] = useState(false);
+    const [scanAttempts, setScanAttempts] = useState(0);
+    const maxScanAttempts = 3;
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
         if (!data?.text || loading) return;
@@ -55,6 +66,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         try {
             setLoading(true);
             setError(null);
+            setScanAttempts(prev => prev + 1);
 
             // Verify employee
             const { data: employee, error: employeeError } = await supabase
@@ -179,14 +191,26 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             setShowResult(true);
             setScanning(false);
 
+            // Reset scan attempts on success
+            setScanAttempts(0);
+
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
             setError(errorMessage);
             onError?.(errorMessage);
+
+            // Handle maximum scan attempts
+            if (scanAttempts >= maxScanAttempts) {
+                enqueueSnackbar('Maximum scan attempts reached. Please try again later.', {
+                    variant: 'warning',
+                    autoHideDuration: 4000
+                });
+                handleReset();
+            }
         } finally {
             setLoading(false);
         }
-    }, [loading, onResult, onError, onScanComplete, user?.id]);
+    }, [loading, onResult, onError, onScanComplete, user?.id, scanAttempts]);
 
     const handleError = useCallback((err: Error) => {
         setError(err.message);
@@ -248,6 +272,58 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
         }
     }, [enqueueSnackbar, facingMode]);
 
+    // Enhanced camera initialization
+    useEffect(() => {
+        const initializeCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: facingMode
+                    }
+                });
+                
+                // Check if torch is available
+                const track = stream.getVideoTracks()[0];
+                // @ts-ignore - Torch capability check
+                setHasTorch(track.getCapabilities?.()?.torch || false);
+                
+                // Cleanup stream
+                stream.getTracks().forEach(track => track.stop());
+                setScannerReady(true);
+            } catch (err) {
+                console.error('Camera initialization error:', err);
+                setCameraError('Failed to initialize camera. Please check permissions.');
+                setCameraAvailable(false);
+            }
+        };
+
+        initializeCamera();
+    }, [facingMode]);
+
+    // Enhanced camera controls
+    const handleTorchToggle = useCallback(async () => {
+        try {
+            const videoElement = document.querySelector('video');
+            if (videoElement?.srcObject) {
+                const stream = videoElement.srcObject as MediaStream;
+                const track = stream.getVideoTracks()[0];
+                // @ts-ignore - Torch control
+                await track.applyConstraints({ torch: !torchEnabled });
+                setTorchEnabled(!torchEnabled);
+                enqueueSnackbar(`Torch ${!torchEnabled ? 'enabled' : 'disabled'}`, {
+                    variant: 'success',
+                    autoHideDuration: 2000
+                });
+            }
+        } catch (err) {
+            console.error('Torch toggle error:', err);
+            enqueueSnackbar('Failed to toggle torch', {
+                variant: 'error',
+                autoHideDuration: 3000
+            });
+        }
+    }, [torchEnabled, enqueueSnackbar]);
+
     // Check camera availability on mount
     useEffect(() => {
         const checkCameras = async () => {
@@ -267,189 +343,227 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
     return (
         <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
             {scanning ? (
-                <Paper
-                    elevation={0}
+                <Fade in timeout={300}>
+                    <Paper
+                        elevation={0}
                     sx={{
-                        p: 2,
-                        borderRadius: 4,
-                        background: theme => alpha(theme.palette.background.paper, 0.8),
-                        backdropFilter: 'blur(10px)',
-                        border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                            p: 2,
+                            borderRadius: 4,
+                            background: theme => alpha(theme.palette.background.paper, 0.8),
+                            backdropFilter: 'blur(10px)',
+                            border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
                         position: 'relative',
-                        overflow: 'hidden'
-                    }}
-                >
-                    <Box sx={{ position: 'relative' }}>
-                        <QrScanner
-                            key={key}
-                            onError={handleError}
-                            onScan={(result) => result && handleScan({ text: result.text })}
-                            facingMode={facingMode}
-                            delay={1000}
-                            style={{ 
-                                width: '100%', 
-                                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
-                                transition: 'transform 0.3s ease'
-                            }}
-                        />
-                        <Box
-                            sx={{
-                                position: 'absolute',
-                                top: 16,
-                                left: 16,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                background: 'rgba(0, 0, 0, 0.6)',
-                                color: 'white',
-                                padding: '8px 12px',
-                                borderRadius: 2,
-                                backdropFilter: 'blur(4px)',
-                                animation: 'fadeIn 0.3s ease-out',
-                                '@keyframes fadeIn': {
-                                    from: { opacity: 0, transform: 'translateY(-10px)' },
-                                    to: { opacity: 1, transform: 'translateY(0)' }
+                            overflow: 'hidden',
+                        '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                width: '200px',
+                                height: '200px',
+                                border: `2px solid ${theme.palette.primary.main}`,
+                                borderRadius: '10px',
+                                transform: 'translate(-50%, -50%)',
+                                animation: 'scan 2s infinite',
+                                zIndex: 2
+                            },
+                            '@keyframes scan': {
+                                '0%': {
+                                    boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0.4)}`
+                            },
+                            '100%': {
+                                    boxShadow: `0 0 0 20px ${alpha(theme.palette.primary.main, 0)}`
                                 }
-                            }}
-                        >
-                            <FlipCameraIcon sx={{ fontSize: 20 }} />
-                            <Typography variant="caption" sx={{ fontSize: '0.875rem' }}>
-                                {facingMode === 'user' ? 'Front Camera' : 'Back Camera'}
-                            </Typography>
-                        </Box>
-                    </Box>
-                    {cameraAvailable && (
-                        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                            <Tooltip title={isFlipping ? 'Switching...' : `Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
-                                <IconButton
-                                    onClick={handleSwitchCamera}
-                                    disabled={isFlipping}
-                                    sx={{
-                                        background: theme => alpha(theme.palette.primary.main, 0.1),
-                                        '&:hover': {
-                                            background: theme => alpha(theme.palette.primary.main, 0.2),
-                                            transform: 'scale(1.05)'
-                                        },
-                                        '&:disabled': {
-                                            opacity: 0.5
-                                        },
-                                        transition: 'all 0.2s ease'
-                                    }}
-                                >
-                                    {isFlipping ? (
-                                        <CircularProgress size={24} />
-                                    ) : (
-                                        <FlipCameraIcon />
-                                    )}
-                                </IconButton>
-                            </Tooltip>
-                                <Typography 
-                                variant="body2"
-                                    sx={{
-                                    color: theme => alpha(theme.palette.text.primary, 0.7),
-                                    textAlign: 'center',
-                                    minHeight: 24
+                            }
+                        }}
+                    >
+                        <Box sx={{ position: 'relative' }}>
+                            <QrScanner
+                                key={key}
+                                onError={handleError}
+                                onScan={(result) => result && handleScan({ text: result.text })}
+                                facingMode={facingMode}
+                                delay={1000}
+                                style={{
+                                    width: '100%',
+                                    transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+                                    transition: 'transform 0.3s ease',
+                                    borderRadius: '8px'
+                                }}
+                            />
+
+                            {/* Camera Controls Overlay */}
+                            <Stack
+                                direction="row"
+                                spacing={2}
+                                sx={{
+                                    position: 'absolute',
+                                    bottom: 16,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    background: 'rgba(0, 0, 0, 0.6)',
+                                    borderRadius: 3,
+                                    p: 1,
+                                    backdropFilter: 'blur(4px)'
                                 }}
                             >
-                                {isFlipping ? (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <CircularProgress size={16} />
-                                        Switching camera...
-                                    </Box>
-                                ) : (
-                                    `Tap to switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`
+                                {cameraAvailable && (
+                                    <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
+                                        <IconButton
+                                            onClick={handleSwitchCamera}
+                                            disabled={isFlipping}
+                                            color="primary"
+                                            size="small"
+                                        >
+                                            {isFlipping ? <CircularProgress size={20} /> : <FlipCameraIcon />}
+                                        </IconButton>
+                                    </Tooltip>
                                 )}
+
+                                {hasTorch && (
+                                    <Tooltip title={`${torchEnabled ? 'Disable' : 'Enable'} Torch`}>
+                                        <IconButton
+                                            onClick={handleTorchToggle}
+                                            color="primary"
+                                            size="small"
+                                        >
+                                            <BrightnessIcon />
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
+
+                                <Tooltip title="Reset Scanner">
+                                    <IconButton
+                                        onClick={handleReset}
+                                        color="primary"
+                                        size="small"
+                                    >
+                                        <RestartIcon />
+                                    </IconButton>
+                                </Tooltip>
+                            </Stack>
+
+                            {/* Scanner Status Indicator */}
+                            <Zoom in={scannerReady}>
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 16,
+                                        left: 16,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1,
+                                        background: 'rgba(0, 0, 0, 0.6)',
+                                        color: 'white',
+                                        padding: '8px 12px',
+                                        borderRadius: 2,
+                                        backdropFilter: 'blur(4px)'
+                                    }}
+                                >
+                                    <QrCodeIcon sx={{ fontSize: 20 }} />
+                                    <Typography variant="caption">
+                                        Scanner Ready
+                                    </Typography>
+                                </Box>
+                            </Zoom>
+                        </Box>
+                    </Paper>
+                </Fade>
+            ) : null}
+
+            {showResult && scannedEmployee && (
+                <Zoom in>
+                    <Paper
+                        elevation={0}
+                                    sx={{
+                            p: 3,
+                            mt: 2,
+                            borderRadius: 4,
+                            background: theme => alpha(theme.palette.background.paper, 0.8),
+                            backdropFilter: 'blur(10px)',
+                            border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                            position: 'relative'
+                        }}
+                    >
+                        <Typography variant="h6" gutterBottom>
+                            {scannedEmployee.first_name} {scannedEmployee.last_name}
+                        </Typography>
+                        <Typography color="textSecondary" gutterBottom>
+                            ID: {scannedEmployee.employee_id}
+                        </Typography>
+                        <Typography color="textSecondary" gutterBottom>
+                            Department: {scannedEmployee.department}
+                        </Typography>
+                        
+                        {workingHours && (
+                            <>
+                                <Typography variant="subtitle1" sx={{ mt: 2, fontWeight: 600 }}>
+                                    Today's Record:
                                 </Typography>
-                            </Box>
-                    )}
-                    {cameraError && (
+                                <Typography color="textSecondary">
+                                    Check-in: {format(new Date(workingHours.check_in), 'hh:mm a')}
+                                    {workingHours.is_late && (
+                                        <Typography component="span" color="error" sx={{ ml: 1 }}>
+                                            (Late)
+                                        </Typography>
+                                    )}
+                                </Typography>
+                                {workingHours.check_out && (
+                                    <>
+                                        <Typography color="textSecondary">
+                                            Check-out: {format(new Date(workingHours.check_out), 'hh:mm a')}
+                                        </Typography>
+                                        <Typography color="textSecondary">
+                                            Total Hours: {workingHours.total_hours?.toFixed(2)}
+                                        </Typography>
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        <Button
+                            variant="outlined"
+                            startIcon={<CameraIcon />}
+                            onClick={handleReset}
+                            sx={{ mt: 2 }}
+                            fullWidth
+                        >
+                            Scan Another QR Code
+                        </Button>
+                    </Paper>
+                </Zoom>
+            )}
+
+                            {error && (
+                <Zoom in>
                                     <Alert 
                                         severity="error"
                                         sx={{ 
-                                mt: 2,
+                            mt: 2,
                                             borderRadius: 2,
-                                animation: 'slideIn 0.3s ease-out',
-                                '@keyframes slideIn': {
-                                    from: { transform: 'translateY(-20px)', opacity: 0 },
-                                    to: { transform: 'translateY(0)', opacity: 1 }
-                                }
-                            }}
-                            onClose={() => setCameraError(null)}
-                        >
-                            {cameraError}
+                            animation: 'slideIn 0.3s ease-out',
+                            '@keyframes slideIn': {
+                                from: { transform: 'translateY(-20px)', opacity: 0 },
+                                to: { transform: 'translateY(0)', opacity: 1 }
+                            }
+                                        }}
+                                        action={
+                                            <Button 
+                                color="inherit"
+                                                size="small" 
+                                onClick={() => {
+                                    setError(null);
+                                    handleReset();
+                                }}
+                            >
+                                Retry
+                                            </Button>
+                                        }
+                                    >
+                                        {error}
                                     </Alert>
+                                </Zoom>
                             )}
-                </Paper>
-            ) : null}
-
-                            {loading && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                    <CircularProgress />
-                                    </Box>
-            )}
-
-            {error && (
-                <Alert 
-                    severity="error" 
-                    sx={{ mt: 2 }}
-                    onClose={() => {
-                        setError(null);
-                        handleReset();
-                    }}
-                >
-                    {error}
-                </Alert>
-            )}
-
-            {showResult && scannedEmployee && (
-                <Paper 
-                    elevation={0}
-                    sx={{ 
-                        p: 3, 
-                        mt: 2,
-                        borderRadius: 4,
-                        background: theme => alpha(theme.palette.background.paper, 0.8),
-                        backdropFilter: 'blur(10px)',
-                        border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-                    }}
-                >
-                    <Typography variant="h6" gutterBottom>
-                        {scannedEmployee.first_name} {scannedEmployee.last_name}
-                    </Typography>
-                    <Typography color="textSecondary" gutterBottom>
-                        ID: {scannedEmployee.employee_id}
-                    </Typography>
-                    <Typography color="textSecondary" gutterBottom>
-                        Department: {scannedEmployee.department}
-                    </Typography>
-                    
-                    {workingHours && (
-                        <>
-                            <Typography variant="subtitle1" sx={{ mt: 2, fontWeight: 600 }}>
-                                Today's Record:
-                            </Typography>
-                            <Typography color="textSecondary">
-                                Check-in: {format(new Date(workingHours.check_in), 'hh:mm a')}
-                                {workingHours.is_late && (
-                                    <Typography component="span" color="error" sx={{ ml: 1 }}>
-                                        (Late)
-                                    </Typography>
-                                )}
-                            </Typography>
-                            {workingHours.check_out && (
-                                <>
-                                    <Typography color="textSecondary">
-                                        Check-out: {format(new Date(workingHours.check_out), 'hh:mm a')}
-                                    </Typography>
-                                    <Typography color="textSecondary">
-                                        Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                                    </Typography>
-                                </>
-                            )}
-                        </>
-                    )}
-                </Paper>
-            )}
         </Box>
     );
 };

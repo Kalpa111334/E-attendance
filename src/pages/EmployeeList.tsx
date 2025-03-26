@@ -30,6 +30,7 @@ import {
     Stack,
     useTheme,
     alpha,
+    Checkbox,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -54,6 +55,7 @@ interface Employee {
     department: string;
     position: string;
     created_at: string;
+    selected?: boolean;
 }
 
 const EmployeeList: React.FC = () => {
@@ -67,6 +69,7 @@ const EmployeeList: React.FC = () => {
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
     const [isDeletingAll, setIsDeletingAll] = useState(false);
+    const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
 
     const navigate = useNavigate();
     const theme = useTheme();
@@ -171,6 +174,26 @@ const EmployeeList: React.FC = () => {
         } finally {
             setIsDeletingAll(false);
         }
+    };
+
+    const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.checked) {
+            setSelectedEmployees(new Set(filteredEmployees.map(emp => emp.id)));
+        } else {
+            setSelectedEmployees(new Set());
+        }
+    };
+
+    const handleSelectEmployee = (employeeId: string) => {
+        setSelectedEmployees(prev => {
+            const newSelected = new Set(prev);
+            if (newSelected.has(employeeId)) {
+                newSelected.delete(employeeId);
+            } else {
+                newSelected.add(employeeId);
+            }
+            return newSelected;
+        });
     };
 
     const filteredEmployees = employees.filter(employee => {
@@ -356,6 +379,27 @@ const EmployeeList: React.FC = () => {
                         <Table>
                             <TableHead>
                                 <TableRow>
+                                    <TableCell padding="checkbox">
+                                        <Checkbox
+                                            indeterminate={
+                                                selectedEmployees.size > 0 && 
+                                                selectedEmployees.size < filteredEmployees.length
+                                            }
+                                            checked={
+                                                filteredEmployees.length > 0 && 
+                                                selectedEmployees.size === filteredEmployees.length
+                                            }
+                                            onChange={handleSelectAll}
+                                            sx={{
+                                                '&.Mui-checked': {
+                                                    color: theme.palette.primary.main,
+                                                },
+                                                '&.MuiCheckbox-indeterminate': {
+                                                    color: theme.palette.primary.main,
+                                                },
+                                            }}
+                                        />
+                                    </TableCell>
                                     <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Name</TableCell>
                                     <TableCell>ID</TableCell>
                                     <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>Email</TableCell>
@@ -379,7 +423,29 @@ const EmployeeList: React.FC = () => {
                                     </TableRow>
                                 ) : (
                                     filteredEmployees.map((employee) => (
-                                        <TableRow key={employee.id}>
+                                        <TableRow 
+                                            key={employee.id}
+                                            selected={selectedEmployees.has(employee.id)}
+                                            sx={{
+                                                '&.Mui-selected': {
+                                                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                                                    '&:hover': {
+                                                        backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                                                    },
+                                                },
+                                            }}
+                                        >
+                                            <TableCell padding="checkbox">
+                                                <Checkbox
+                                                    checked={selectedEmployees.has(employee.id)}
+                                                    onChange={() => handleSelectEmployee(employee.id)}
+                                                    sx={{
+                                                        '&.Mui-checked': {
+                                                            color: theme.palette.primary.main,
+                                                        },
+                                                    }}
+                                                />
+                                            </TableCell>
                                             <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                                                 {employee.first_name} {employee.last_name}
                                             </TableCell>
@@ -453,6 +519,44 @@ const EmployeeList: React.FC = () => {
                             </TableBody>
                         </Table>
                     </TableContainer>
+
+                    {selectedEmployees.size > 0 && (
+                        <Box 
+                            sx={{ 
+                                mt: 2,
+                                p: 2,
+                                borderRadius: 2,
+                                backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: 2
+                            }}
+                        >
+                            <Typography>
+                                {selectedEmployees.size} {selectedEmployees.size === 1 ? 'employee' : 'employees'} selected
+                            </Typography>
+                            <Stack direction="row" spacing={2}>
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setSelectedEmployees(new Set())}
+                                >
+                                    Clear Selection
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    onClick={() => {
+                                        setSelectedEmployee(null);
+                                        setDeleteDialogOpen(true);
+                                    }}
+                                >
+                                    Delete Selected
+                                </Button>
+                            </Stack>
+                        </Box>
+                    )}
                 </CardContent>
             </Card>
 
