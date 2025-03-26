@@ -54,10 +54,7 @@ const QRCodeView: React.FC = () => {
         try {
             const { data, error } = await supabase
                 .from('employees')
-                .select(`
-                    *,
-                    department:departments(id, name)
-                `)
+                .select('*')
                 .eq('employee_id', employeeId)
                 .single();
 
