@@ -54,7 +54,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     const [scannedEmployee, setScannedEmployee] = useState<any>(null);
     const [showResult, setShowResult] = useState(false);
     const [workingHours, setWorkingHours] = useState<WorkingHoursRecord | null>(null);
-    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>(initialFacingMode);
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isFlipping, setIsFlipping] = useState(false);
     const [key, setKey] = useState(0);
@@ -315,9 +315,15 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     useEffect(() => {
         const initCamera = async () => {
             try {
-                // Start with back camera by default
+                // Explicitly set back camera on initialization
                 setFacingMode('environment');
                 setCameraAvailable(true);
+                setKey(prev => prev + 1); // Force QrScanner remount with back camera
+                
+                enqueueSnackbar('Camera initialized with back camera', {
+                    variant: 'success',
+                    autoHideDuration: 2000
+                });
             } catch (error) {
                 console.error('Error initializing camera:', error);
                 enqueueSnackbar('Failed to initialize camera', { variant: 'error' });
@@ -331,7 +337,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 stream.getTracks().forEach(track => track.stop());
             }
         };
-    }, []);
+    }, []); // Empty dependency array ensures this only runs once on mount
 
     // Update stream when camera selection changes
     useEffect(() => {
@@ -413,13 +419,13 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 <Fade in timeout={300}>
                     <Paper
                         elevation={0}
-                        sx={{
+                    sx={{
                             p: 2,
                             borderRadius: 4,
                             background: theme => alpha(theme.palette.background.paper, 0.8),
                             backdropFilter: 'blur(10px)',
                             border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                            position: 'relative',
+                        position: 'relative',
                             overflow: 'hidden'
                         }}
                     >
@@ -443,7 +449,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                 direction="row"
                                 spacing={2}
                                 sx={{
-                                    position: 'absolute',
+                            position: 'absolute',
                                     bottom: 16,
                                     left: '50%',
                                     transform: 'translateX(-50%)',
