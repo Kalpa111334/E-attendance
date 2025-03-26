@@ -54,7 +54,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     const [scannedEmployee, setScannedEmployee] = useState<any>(null);
     const [showResult, setShowResult] = useState(false);
     const [workingHours, setWorkingHours] = useState<WorkingHoursRecord | null>(null);
-    const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+    const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
     const [cameraError, setCameraError] = useState<string | null>(null);
     const [isFlipping, setIsFlipping] = useState(false);
     const [key, setKey] = useState(0);
@@ -289,10 +289,15 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
         setIsFlipping(true);
         try {
-            const newFacingMode = selectedCamera === 'user' ? 'environment' : 'user';
-            setSelectedCamera(newFacingMode);
-            
-            // Stream will be reinitialized by the useEffect below
+            // Stop any existing streams
+            const tracks = await navigator.mediaDevices.getUserMedia({ video: true });
+            tracks.getTracks().forEach(track => track.stop());
+
+            // Switch facing mode
+            const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+            setFacingMode(newFacingMode);
+            setKey(prev => prev + 1); // Force QrScanner remount
+
             enqueueSnackbar(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`, {
                 variant: 'success',
                 autoHideDuration: 2000
@@ -301,9 +306,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
             console.error('Error flipping camera:', error);
             enqueueSnackbar('Failed to switch camera', { variant: 'error' });
         } finally {
-            setIsFlipping(false);
+            setTimeout(() => setIsFlipping(false), 500); // Add slight delay for animation
         }
-    }, [isFlipping, cameraAvailable, selectedCamera, enqueueSnackbar]);
+    }, [isFlipping, cameraAvailable, facingMode, enqueueSnackbar]);
 
     // Initialize cameras on mount
     useEffect(() => {
@@ -378,7 +383,11 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                             transform: isFlipping ? 'rotate(180deg)' : 'none',
                         }}
                     >
-                        <FlipCameraIcon />
+                        {isFlipping ? (
+                            <CircularProgress size={24} />
+                        ) : (
+                            <FlipCameraIcon />
+                        )}
                     </IconButton>
                 </span>
             </Tooltip>
