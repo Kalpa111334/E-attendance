@@ -31,6 +31,7 @@ import {
     useTheme,
     alpha,
     Checkbox,
+    Link,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -196,6 +197,30 @@ const EmployeeList: React.FC = () => {
         });
     };
 
+    const handleDeleteSelectedEmployees = async () => {
+        if (selectedEmployees.size === 0) return;
+
+        try {
+            setIsDeletingAll(true);
+            const { error } = await supabase
+                .from('employees')
+                .delete()
+                .in('id', Array.from(selectedEmployees));
+
+            if (error) throw error;
+
+            toast.success('Selected employees deleted successfully');
+            await fetchEmployees();
+            setSelectedEmployees(new Set());
+            setDeleteDialogOpen(false);
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to delete selected employees');
+        } finally {
+            setIsDeletingAll(false);
+        }
+    };
+
     const filteredEmployees = employees.filter(employee => {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = 
@@ -296,21 +321,37 @@ const EmployeeList: React.FC = () => {
                                 variant="contained"
                                 color="error"
                                 startIcon={<DeleteIcon />}
-                                onClick={() => setDeleteAllDialogOpen(true)}
-                                disabled={employees.length === 0}
-                                sx={{ 
-                                    minWidth: { xs: '100%', sm: 120 }
+                                onClick={() => setDeleteDialogOpen(true)}
+                                disabled={selectedEmployees.size === 0}
+                                sx={{
+                                    mb: { xs: 1, sm: 0 },
+                                    background: `linear-gradient(45deg, 
+                                        ${theme.palette.error.main}, 
+                                        ${alpha(theme.palette.error.main, 0.8)})`,
+                                    '&:hover': {
+                                        background: `linear-gradient(45deg, 
+                                            ${theme.palette.error.dark}, 
+                                            ${alpha(theme.palette.error.dark, 0.8)})`
+                                    }
                                 }}
                             >
-                                Delete All
+                                Delete Selected ({selectedEmployees.size})
                             </Button>
                             <Button
                                 fullWidth
                                 variant="contained"
-                                startIcon={<AddIcon />}
+                                color="primary"
                                 onClick={() => navigate('/employees/new')}
-                                sx={{ 
-                                    minWidth: { xs: '100%', sm: 120 }
+                                startIcon={<AddIcon />}
+                                sx={{
+                                    background: `linear-gradient(45deg, 
+                                        ${theme.palette.primary.main}, 
+                                        ${theme.palette.secondary.main})`,
+                                    '&:hover': {
+                                        background: `linear-gradient(45deg, 
+                                            ${theme.palette.primary.dark}, 
+                                            ${theme.palette.secondary.dark})`
+                                    }
                                 }}
                             >
                                 Add Employee
@@ -576,10 +617,10 @@ const EmployeeList: React.FC = () => {
                     }
                 }}
             >
-                <DialogTitle>Confirm Delete</DialogTitle>
+                <DialogTitle>Delete Selected Employees</DialogTitle>
                 <DialogContent>
                     <Typography>
-                        Are you sure you want to delete {selectedEmployee?.first_name} {selectedEmployee?.last_name}?
+                        Are you sure you want to delete {selectedEmployees.size} selected employee(s)?
                         This action cannot be undone.
                     </Typography>
                 </DialogContent>
@@ -591,7 +632,7 @@ const EmployeeList: React.FC = () => {
                         Cancel
                     </Button>
                     <Button 
-                        onClick={handleDeleteEmployee}
+                        onClick={handleDeleteSelectedEmployees}
                         color="error"
                         variant="contained"
                         disabled={!!processingId}
