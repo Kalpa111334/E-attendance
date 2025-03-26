@@ -290,8 +290,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         setIsFlipping(true);
         try {
             // Stop any existing streams
-            const tracks = await navigator.mediaDevices.getUserMedia({ video: true });
-            tracks.getTracks().forEach(track => track.stop());
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
 
             // Switch facing mode
             const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
@@ -308,11 +309,23 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         } finally {
             setTimeout(() => setIsFlipping(false), 500); // Add slight delay for animation
         }
-    }, [isFlipping, cameraAvailable, facingMode, enqueueSnackbar]);
+    }, [isFlipping, cameraAvailable, facingMode, stream, enqueueSnackbar]);
 
-    // Initialize cameras on mount
+    // Initialize camera on mount
     useEffect(() => {
-        initializeCameras();
+        const initCamera = async () => {
+            try {
+                // Start with back camera by default
+                setFacingMode('environment');
+                setCameraAvailable(true);
+            } catch (error) {
+                console.error('Error initializing camera:', error);
+                enqueueSnackbar('Failed to initialize camera', { variant: 'error' });
+                setCameraAvailable(false);
+            }
+        };
+
+        initCamera();
         return () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
@@ -400,35 +413,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 <Fade in timeout={300}>
                     <Paper
                         elevation={0}
-                    sx={{
+                        sx={{
                             p: 2,
                             borderRadius: 4,
                             background: theme => alpha(theme.palette.background.paper, 0.8),
                             backdropFilter: 'blur(10px)',
                             border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                        position: 'relative',
-                            overflow: 'hidden',
-                        '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                                top: '50%',
-                                left: '50%',
-                                width: '200px',
-                                height: '200px',
-                                border: `2px solid ${theme.palette.primary.main}`,
-                                borderRadius: '10px',
-                                transform: 'translate(-50%, -50%)',
-                                animation: 'scan 2s infinite',
-                                zIndex: 2
-                            },
-                            '@keyframes scan': {
-                                '0%': {
-                                    boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0.4)}`
-                            },
-                            '100%': {
-                                    boxShadow: `0 0 0 20px ${alpha(theme.palette.primary.main, 0)}`
-                                }
-                            }
+                            position: 'relative',
+                            overflow: 'hidden'
                         }}
                     >
                         <Box sx={{ position: 'relative' }}>
