@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Typography, CircularProgress, Alert, Paper, alpha, useTheme, IconButton, Tooltip, Button, Fade, Zoom, Stack } from '@mui/material';
 import QrScanner from 'react-qr-scanner';
 import { supabase } from '../config/supabase';
@@ -38,7 +38,6 @@ interface CameraDevice {
     deviceId: string;
     label: string;
     type: 'user' | 'environment';
-    capabilities: MediaTrackCapabilities;
 }
 
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ 
@@ -71,6 +70,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [cameraQuality, setCameraQuality] = useState<'HD' | 'SD'>('HD');
     const [focusMode, setFocusMode] = useState<'auto' | 'continuous'>('continuous');
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
         if (!data?.text || loading) return;
@@ -237,111 +237,88 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         setWorkingHours(null);
     };
 
-    const initializeCamera = useCallback(async () => {
+    const initializeCameras = useCallback(async () => {
         try {
-            // Request camera with advanced constraints
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: initialFacingMode,
-                    width: { ideal: cameraQuality === 'HD' ? 1920 : 1280 },
-                    height: { ideal: cameraQuality === 'HD' ? 1080 : 720 },
-                    frameRate: { ideal: 30 }
-                }
-            });
-
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = await Promise.all(
-                devices
-                    .filter(device => device.kind === 'videoinput')
-                    .map(async device => {
-                        const stream = await navigator.mediaDevices.getUserMedia({
-                            video: { deviceId: { exact: device.deviceId } }
-                        });
-                        const track = stream.getVideoTracks()[0];
-                        const capabilities = track.getCapabilities();
-                        stream.getTracks().forEach(track => track.stop());
-
-                        const isUserFacing = device.label.toLowerCase().includes('front');
-                        return {
-                            deviceId: device.deviceId,
-                            label: device.label || `Camera ${device.deviceId.slice(0, 4)}`,
-                            type: isUserFacing ? 'user' as const : 'environment' as const,
-                            capabilities
-                        } satisfies CameraDevice;
-                    })
-            );
-
+            const videoDevices = devices
+                .filter(device => device.kind === 'videoinput')
+                .map(device => ({
+                    deviceId: device.deviceId,
+                    label: device.label || `Camera ${device.deviceId.slice(0, 4)}`,
+                    type: device.label.toLowerCase().includes('front') ? 'user' as const : 'environment' as const
+                }));
             setAvailableCameras(videoDevices);
             setCameraAvailable(videoDevices.length > 0);
-
-            if (videoDevices.length > 0) {
-                const defaultCamera = videoDevices.find(d => d.type === initialFacingMode) || videoDevices[0];
-                setSelectedCamera(defaultCamera.deviceId);
-                setFacingMode(defaultCamera.type);
-                
-                // Set torch availability
-                setHasTorch('torch' in defaultCamera.capabilities);
-            }
-
-            stream.getTracks().forEach(track => track.stop());
-            setScannerReady(true);
-            
-        } catch (err) {
-            console.error('Camera initialization error:', err);
-            setCameraError('Failed to initialize camera. Please check permissions.');
+        } catch (error) {
+            console.error('Error getting camera devices:', error);
+            enqueueSnackbar('Failed to detect cameras', { variant: 'error' });
             setCameraAvailable(false);
         }
-    }, [initialFacingMode, cameraQuality]);
+    }, [enqueueSnackbar]);
 
-    const handleSwitchCamera = useCallback(async () => {
-        if (isFlipping || availableCameras.length < 2) return;
-
+    const initializeStream = useCallback(async () => {
+        if (!cameraAvailable) return;
+        
         try {
-            setIsFlipping(true);
-            setCameraError(null);
-
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
 
-            const currentIndex = availableCameras.findIndex(cam => cam.deviceId === selectedCamera);
-            const nextIndex = (currentIndex + 1) % availableCameras.length;
-            const nextCamera = availableCameras[nextIndex];
-
-            // Apply optimal settings for the new camera
-            const constraints = {
+            const newStream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    deviceId: { exact: nextCamera.deviceId },
-                    width: { ideal: cameraQuality === 'HD' ? 1920 : 1280 },
-                    height: { ideal: cameraQuality === 'HD' ? 1080 : 720 },
+                    facingMode: selectedCamera,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
                     frameRate: { ideal: 30 }
                 }
-            };
+            });
 
-            const newStream = await navigator.mediaDevices.getUserMedia(constraints);
             setStream(newStream);
-            setSelectedCamera(nextCamera.deviceId);
-            setFacingMode(nextCamera.type);
-            setKey(prev => prev + 1);
+            if (videoRef.current) {
+                videoRef.current.srcObject = newStream;
+            }
+        } catch (error) {
+            console.error('Error accessing camera:', error);
+            enqueueSnackbar('Failed to access camera', { variant: 'error' });
+            setCameraAvailable(false);
+        }
+    }, [cameraAvailable, selectedCamera, stream, enqueueSnackbar]);
 
-            // Update torch availability for new camera
-            const track = newStream.getVideoTracks()[0];
-            setHasTorch('torch' in track.getCapabilities());
+    const handleFlipCamera = useCallback(async () => {
+        if (isFlipping || !cameraAvailable) return;
 
-            enqueueSnackbar(`Switched to ${nextCamera.label} (${cameraQuality})`, {
+        setIsFlipping(true);
+        try {
+            const newFacingMode = selectedCamera === 'user' ? 'environment' : 'user';
+            setSelectedCamera(newFacingMode);
+            
+            // Stream will be reinitialized by the useEffect below
+            enqueueSnackbar(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`, {
                 variant: 'success',
                 autoHideDuration: 2000
             });
-
-        } catch (err) {
-            console.error('Camera switch error:', err);
-            const errorMessage = err instanceof Error ? err.message : 'Failed to switch camera';
-            setCameraError(errorMessage);
-            enqueueSnackbar(errorMessage, { variant: 'error' });
+        } catch (error) {
+            console.error('Error flipping camera:', error);
+            enqueueSnackbar('Failed to switch camera', { variant: 'error' });
         } finally {
             setIsFlipping(false);
         }
-    }, [enqueueSnackbar, isFlipping, selectedCamera, availableCameras, stream, cameraQuality]);
+    }, [isFlipping, cameraAvailable, selectedCamera, enqueueSnackbar]);
+
+    // Initialize cameras on mount
+    useEffect(() => {
+        initializeCameras();
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, []);
+
+    // Update stream when camera selection changes
+    useEffect(() => {
+        initializeStream();
+    }, [selectedCamera, initializeStream]);
 
     // Add camera quality toggle
     const toggleCameraQuality = useCallback(() => {
@@ -350,52 +327,6 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
             variant: 'info'
         });
     }, [cameraQuality, enqueueSnackbar]);
-
-    // Initialize camera on mount
-    useEffect(() => {
-        initializeCamera();
-        return () => {
-            // Cleanup stream on unmount
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-        };
-    }, [initializeCamera]);
-
-    // Update stream reference when camera changes
-    useEffect(() => {
-        const updateStream = async () => {
-            try {
-                if (selectedCamera) {
-                    const constraints = {
-                        video: {
-                            deviceId: { exact: selectedCamera },
-                            facingMode: facingMode
-                        }
-                    };
-
-                    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    
-                    // Update video element directly
-                    const videoElement = document.querySelector('video');
-                    if (videoElement) {
-                        videoElement.srcObject = newStream;
-                    }
-
-                    setStream(newStream);
-
-                    // Check torch capability
-                    const track = newStream.getVideoTracks()[0];
-                    // @ts-ignore - Torch capability check
-                    setHasTorch(track.getCapabilities?.()?.torch || false);
-                }
-            } catch (err) {
-                console.error('Stream update error:', err);
-            }
-        };
-
-        updateStream();
-    }, [selectedCamera, facingMode]);
 
     // Enhanced camera controls
     const handleTorchToggle = useCallback(async () => {
@@ -421,8 +352,41 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         }
     }, [torchEnabled, enqueueSnackbar]);
 
+    // Render camera controls
+    const renderCameraControls = () => (
+        <Box
+            sx={{
+                position: 'absolute',
+                bottom: 16,
+                right: 16,
+                display: 'flex',
+                gap: 1,
+                zIndex: 1,
+            }}
+        >
+            <Tooltip title="Flip Camera" arrow>
+                <span>
+                    <IconButton
+                        onClick={handleFlipCamera}
+                        disabled={!cameraAvailable || isFlipping}
+                        sx={{
+                            bgcolor: 'rgba(255, 255, 255, 0.8)',
+                            '&:hover': {
+                                bgcolor: 'rgba(255, 255, 255, 0.9)',
+                            },
+                            transition: 'all 0.3s ease',
+                            transform: isFlipping ? 'rotate(180deg)' : 'none',
+                        }}
+                    >
+                        <FlipCameraIcon />
+                    </IconButton>
+                </span>
+            </Tooltip>
+        </Box>
+    );
+
     return (
-        <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
+        <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
             {scanning ? (
                 <Fade in timeout={300}>
                     <Paper
@@ -489,32 +453,6 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                     zIndex: 2
                                 }}
                             >
-                                {availableCameras.length > 1 && (
-                                    <Tooltip title={`Switch Camera (${availableCameras.length} available)`}>
-                                        <IconButton
-                                            onClick={handleSwitchCamera}
-                                            disabled={isFlipping}
-                                            color="primary"
-                                            size="small"
-                                            sx={{
-                                                transition: 'transform 0.2s',
-                                                '&:hover': {
-                                                    transform: 'scale(1.1)'
-                                                },
-                                                '&:active': {
-                                                    transform: 'scale(0.95)'
-                                                }
-                                            }}
-                                        >
-                                            {isFlipping ? (
-                                                <CircularProgress size={20} />
-                                            ) : (
-                                                <CameraswitchIcon />
-                                            )}
-                                        </IconButton>
-                                    </Tooltip>
-                                )}
-
                                 <Tooltip title={`Switch to ${cameraQuality === 'HD' ? 'Standard' : 'High'} Quality`}>
                                     <IconButton
                                         onClick={toggleCameraQuality}
@@ -676,6 +614,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                     </Alert>
                                 </Zoom>
                             )}
+            {renderCameraControls()}
         </Box>
     );
 };
