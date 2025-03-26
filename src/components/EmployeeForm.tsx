@@ -25,15 +25,22 @@ interface EmployeeFormProps {
 }
 
 const departmentOptions = [
-    'IT',
-    'HR',
-    'Finance',
-    'Marketing',
+    'DT Activity',
+    'Kitchen',
+    'Food & Beverage Department',
+    'Butchery',
     'Operations',
-    'Sales',
-    'DT_Activity',
-    'Administration',
-    'Management'
+    'Maintenance',
+    'Reservations',
+    'House Keeping',
+    'Pastry Kitchen',
+    'Stores',
+    'Purchasing & Stores',
+    'Accounts Department',
+    'IT',
+    'Transport Section',
+    'Security Department',
+    'Human Resources'
 ];
 
 const POSITIONS = [
