@@ -353,7 +353,7 @@ const QRCodeView: React.FC = () => {
                                                                 Department
                                                             </Typography>
                                                             <Chip
-                                                                label={employee.department}
+                                                                label={employee.department?.name || 'N/A'}
                                                                 sx={{
                                                                     mt: 0.5,
                                                                     bgcolor: alpha(theme.palette.primary.main, 0.1),
