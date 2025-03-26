@@ -52,12 +52,12 @@ const BulkQRGenerator: React.FC = () => {
     const theme = useTheme();
 
     const validateEmployeeData = (data: any): EmployeeFormData | null => {
-        const requiredFields = ['first_name', 'last_name', 'email', 'department', 'position'];
+        const requiredFields = ['first_name', 'last_name', 'email', 'department_id', 'position'];
         const employee: EmployeeFormData = {
             first_name: data.first_name || data['First Name'] || '',
             last_name: data.last_name || data['Last Name'] || '',
             email: data.email || data['Email'] || '',
-            department: data.department || data['Department'] || '',
+            department_id: data.department_id || data['Department ID'] || '',
             position: data.position || data['Position'] || '',
         };
 
