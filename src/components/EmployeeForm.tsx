@@ -25,7 +25,7 @@ interface EmployeeFormProps {
 }
 
 const departmentOptions = [
-    'Administration',
+    'DT Activity',
     'Kitchen',
     'Food & Beverage',
     'Butchery',
