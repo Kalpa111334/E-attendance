@@ -25,22 +25,22 @@ interface EmployeeFormProps {
 }
 
 const departmentOptions = [
-    'DT Activity',
-    'Kitchen',
-    'Food & Beverage',
-    'Butchery',
-    'Operations',
-    'Maintenance',
-    'Reservations',
-    'Housekeeping',
-    'Pastry',
-    'Stores',
-    'Purchasing',
-    'Accounts',
-    'IT',
-    'Transport',
-    'Security',
-    'Human Resources'
+    'dt_activity',
+    'kitchen',
+    'food_and_beverage',
+    'butchery',
+    'operations',
+    'maintenance',
+    'reservations',
+    'housekeeping',
+    'pastry',
+    'stores',
+    'purchasing',
+    'accounts',
+    'it',
+    'transport',
+    'security',
+    'human_resources'
 ];
 
 const POSITIONS = [
@@ -62,6 +62,14 @@ const initialFormData: EmployeeFormData = {
     email: '',
     department: '',
     position: '',
+};
+
+// Add a function to format the display values
+const formatDepartmentName = (dept: string) => {
+    return dept
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 };
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
@@ -364,7 +372,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
                                     >
                                         {departmentOptions.map((dept) => (
                                             <MenuItem key={dept} value={dept}>
-                                                {dept}
+                                                {formatDepartmentName(dept)}
                                             </MenuItem>
                                         ))}
                                     </Select>
