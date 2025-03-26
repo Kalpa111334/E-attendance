@@ -34,6 +34,12 @@ interface ScanResult {
     data: string;
 }
 
+interface CameraDevice {
+    deviceId: string;
+    label: string;
+    type: 'user' | 'environment';
+}
+
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ 
     onResult, 
     onError, 
@@ -59,6 +65,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     const [scannerReady, setScannerReady] = useState(false);
     const [scanAttempts, setScanAttempts] = useState(0);
     const maxScanAttempts = 3;
+    const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
+    const [selectedCamera, setSelectedCamera] = useState<string>('');
+    const [stream, setStream] = useState<MediaStream | null>(null);
 
     const handleScan = useCallback(async (data: { text: string } | null) => {
         if (!data?.text || loading) return;
@@ -225,80 +234,126 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
         setWorkingHours(null);
     };
 
+    const initializeCamera = useCallback(async () => {
+        try {
+            // First, get permission
+            await navigator.mediaDevices.getUserMedia({ video: true });
+            
+            // Then enumerate devices
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices
+                .filter(device => device.kind === 'videoinput')
+                .map(device => {
+                    const isUserFacing = device.label.toLowerCase().includes('front');
+                    return {
+                        deviceId: device.deviceId,
+                        label: device.label || `Camera ${device.deviceId.slice(0, 4)}`,
+                        type: isUserFacing ? 'user' as const : 'environment' as const
+                    };
+                });
+
+            setAvailableCameras(videoDevices);
+            setCameraAvailable(videoDevices.length > 0);
+
+            // Select default camera
+            if (videoDevices.length > 0) {
+                const defaultCamera = videoDevices.find(d => d.type === initialFacingMode) || videoDevices[0];
+                setSelectedCamera(defaultCamera.deviceId);
+                setFacingMode(defaultCamera.type);
+            }
+
+            setScannerReady(true);
+        } catch (err) {
+            console.error('Camera initialization error:', err);
+            setCameraError('Failed to initialize camera. Please check permissions.');
+            setCameraAvailable(false);
+        }
+    }, [initialFacingMode]);
+
     const handleSwitchCamera = useCallback(async () => {
+        if (isFlipping || availableCameras.length < 2) return;
+
         try {
             setIsFlipping(true);
             setCameraError(null);
 
-            // Stop current video stream
-            const videoElement = document.querySelector('video');
-            if (videoElement?.srcObject) {
-                const stream = videoElement.srcObject as MediaStream;
+            // Stop current stream
+            if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
 
-            // Check camera availability
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const videoDevices = devices.filter(device => device.kind === 'videoinput');
-            
-            if (videoDevices.length < 2) {
-                throw new Error('Multiple cameras not available on this device');
-            }
+            // Find next camera
+            const currentIndex = availableCameras.findIndex(cam => cam.deviceId === selectedCamera);
+            const nextIndex = (currentIndex + 1) % availableCameras.length;
+            const nextCamera = availableCameras[nextIndex];
 
-            // Switch camera mode
-            const newMode = facingMode === 'environment' ? 'user' : 'environment';
-            setFacingMode(newMode);
+            // Update states
+            setSelectedCamera(nextCamera.deviceId);
+            setFacingMode(nextCamera.type);
             setKey(prev => prev + 1); // Force QR scanner remount
 
-            enqueueSnackbar(`Switched to ${newMode === 'user' ? 'Front' : 'Back'} Camera`, {
+            enqueueSnackbar(`Switched to ${nextCamera.label}`, {
                 variant: 'success',
                 autoHideDuration: 2000
             });
 
-            // Allow camera initialization
+            // Small delay for camera switch
             await new Promise(resolve => setTimeout(resolve, 500));
-
         } catch (err) {
             console.error('Camera switch error:', err);
             const errorMessage = err instanceof Error ? err.message : 'Failed to switch camera';
             setCameraError(errorMessage);
-            enqueueSnackbar(errorMessage, {
-                variant: 'error',
-                autoHideDuration: 3000
-            });
-            setCameraAvailable(false);
+            enqueueSnackbar(errorMessage, { variant: 'error' });
         } finally {
             setIsFlipping(false);
         }
-    }, [enqueueSnackbar, facingMode]);
+    }, [enqueueSnackbar, isFlipping, selectedCamera, availableCameras, stream]);
 
-    // Enhanced camera initialization
+    // Initialize camera on mount
     useEffect(() => {
-        const initializeCamera = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: facingMode
-                    }
-                });
-                
-                // Check if torch is available
-                const track = stream.getVideoTracks()[0];
-                // @ts-ignore - Torch capability check
-                setHasTorch(track.getCapabilities?.()?.torch || false);
-                
-                // Cleanup stream
+        initializeCamera();
+        return () => {
+            // Cleanup stream on unmount
+            if (stream) {
                 stream.getTracks().forEach(track => track.stop());
-                setScannerReady(true);
+            }
+        };
+    }, [initializeCamera]);
+
+    // Update stream reference when camera changes
+    useEffect(() => {
+        const updateStream = async () => {
+            try {
+                if (selectedCamera) {
+                    const constraints = {
+                        video: {
+                            deviceId: { exact: selectedCamera },
+                            facingMode: facingMode
+                        }
+                    };
+
+                    const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    
+                    // Update video element directly
+                    const videoElement = document.querySelector('video');
+                    if (videoElement) {
+                        videoElement.srcObject = newStream;
+                    }
+
+                    setStream(newStream);
+
+                    // Check torch capability
+                    const track = newStream.getVideoTracks()[0];
+                    // @ts-ignore - Torch capability check
+                    setHasTorch(track.getCapabilities?.()?.torch || false);
+                }
             } catch (err) {
-                console.error('Camera initialization error:', err);
-                setCameraError('Failed to initialize camera. Please check permissions.');
-                setCameraAvailable(false);
+                console.error('Stream update error:', err);
             }
         };
 
-        initializeCamera();
-    }, [facingMode]);
+        updateStream();
+    }, [selectedCamera, facingMode]);
 
     // Enhanced camera controls
     const handleTorchToggle = useCallback(async () => {
@@ -323,22 +378,6 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
             });
         }
     }, [torchEnabled, enqueueSnackbar]);
-
-    // Check camera availability on mount
-    useEffect(() => {
-        const checkCameras = async () => {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                setCameraAvailable(videoDevices.length > 1);
-            } catch (err) {
-                console.error('Error checking cameras:', err);
-                setCameraAvailable(false);
-            }
-        };
-
-        checkCameras();
-    }, []);
 
     return (
         <Box sx={{ width: '100%', maxWidth: 500, mx: 'auto' }}>
@@ -404,11 +443,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                     background: 'rgba(0, 0, 0, 0.6)',
                                     borderRadius: 3,
                                     p: 1,
-                                    backdropFilter: 'blur(4px)'
+                                    backdropFilter: 'blur(4px)',
+                                    zIndex: 2
                                 }}
                             >
-                                {cameraAvailable && (
-                                    <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
+                                {availableCameras.length > 1 && (
+                                    <Tooltip title={isFlipping ? 'Switching...' : `Switch Camera (${availableCameras.length} available)`}>
                                         <IconButton
                                             onClick={handleSwitchCamera}
                                             disabled={isFlipping}
@@ -443,7 +483,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                 </Tooltip>
                             </Stack>
 
-                            {/* Scanner Status Indicator */}
+                            {/* Camera Info Overlay */}
                             <Zoom in={scannerReady}>
                                 <Box
                                     sx={{
@@ -457,12 +497,13 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                         color: 'white',
                                         padding: '8px 12px',
                                         borderRadius: 2,
-                                        backdropFilter: 'blur(4px)'
+                                        backdropFilter: 'blur(4px)',
+                                        zIndex: 2
                                     }}
                                 >
                                     <QrCodeIcon sx={{ fontSize: 20 }} />
                                     <Typography variant="caption">
-                                        Scanner Ready
+                                        {availableCameras.find(cam => cam.deviceId === selectedCamera)?.label || 'Scanner Ready'}
                                     </Typography>
                                 </Box>
                             </Zoom>
