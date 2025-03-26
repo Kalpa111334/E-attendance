@@ -24,23 +24,16 @@ interface EmployeeFormProps {
     employee_id?: string; // If provided, we're in edit mode
 }
 
-const DEPARTMENTS = [
-    'DT Activity',
-    'Kitchen',
-    'Food & Beverage Department',
-    'Butchery',
-    'Operations',
-    'Maintenance',
-    'Reservations',
-    'House Keeping',
-    'Pastry Kitchen',
-    'Stores',
-    'Purchasing & Stores',
-    'Accounts Department',
+const departmentOptions = [
     'IT',
-    'Transport Section',
-    'Security Department',
-    'Human Resources',
+    'HR',
+    'Finance',
+    'Marketing',
+    'Operations',
+    'Sales',
+    'DT_Activity',
+    'Administration',
+    'Management'
 ];
 
 const POSITIONS = [
@@ -362,7 +355,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
                                             }
                                         }}
                                     >
-                                        {DEPARTMENTS.map((dept) => (
+                                        {departmentOptions.map((dept) => (
                                             <MenuItem key={dept} value={dept}>
                                                 {dept}
                                             </MenuItem>
