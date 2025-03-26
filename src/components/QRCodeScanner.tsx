@@ -315,11 +315,41 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
     useEffect(() => {
         const initCamera = async () => {
             try {
-                // Explicitly set back camera on initialization
-                setFacingMode('environment');
-                setCameraAvailable(true);
-                setKey(prev => prev + 1); // Force QrScanner remount with back camera
+                // Initialize camera devices first
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices
+                    .filter(device => device.kind === 'videoinput')
+                    .map(device => ({
+                        deviceId: device.deviceId,
+                        label: device.label || `Camera ${device.deviceId.slice(0, 4)}`,
+                        type: device.label.toLowerCase().includes('front') ? 'user' as const : 'environment' as const
+                    }));
+
+                // Find back camera if available
+                const backCamera = videoDevices.find(device => device.type === 'environment');
                 
+                if (backCamera) {
+                    setSelectedCamera(backCamera.deviceId);
+                }
+                
+                // Explicitly set back camera mode
+                setFacingMode('environment');
+                setCameraAvailable(videoDevices.length > 0);
+                setScannerReady(true);
+                setKey(prev => prev + 1); // Force QrScanner remount
+
+                // Initialize stream with back camera
+                if (videoDevices.length > 0) {
+                    const newStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: cameraQuality === 'HD' ? 1920 : 1280 },
+                            height: { ideal: cameraQuality === 'HD' ? 1080 : 720 }
+                        }
+                    });
+                    setStream(newStream);
+                }
+
                 enqueueSnackbar('Camera initialized with back camera', {
                     variant: 'success',
                     autoHideDuration: 2000
@@ -328,6 +358,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 console.error('Error initializing camera:', error);
                 enqueueSnackbar('Failed to initialize camera', { variant: 'error' });
                 setCameraAvailable(false);
+                setScannerReady(false);
             }
         };
 
@@ -337,7 +368,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 stream.getTracks().forEach(track => track.stop());
             }
         };
-    }, []); // Empty dependency array ensures this only runs once on mount
+    }, [cameraQuality, enqueueSnackbar]);
 
     // Update stream when camera selection changes
     useEffect(() => {
@@ -378,19 +409,19 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
 
     // Render camera controls
     const renderCameraControls = () => (
-        <Box
-            sx={{
-                position: 'absolute',
+                                        <Box
+                                            sx={{
+                                                position: 'absolute',
                 bottom: 16,
                 right: 16,
-                display: 'flex',
-                gap: 1,
+                        display: 'flex', 
+                        gap: 1,
                 zIndex: 1,
             }}
         >
             <Tooltip title="Flip Camera" arrow>
                 <span>
-                    <IconButton
+                    <IconButton 
                         onClick={handleFlipCamera}
                         disabled={!cameraAvailable || isFlipping}
                         sx={{
@@ -419,13 +450,13 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                 <Fade in timeout={300}>
                     <Paper
                         elevation={0}
-                    sx={{
+                        sx={{
                             p: 2,
                             borderRadius: 4,
                             background: theme => alpha(theme.palette.background.paper, 0.8),
                             backdropFilter: 'blur(10px)',
                             border: theme => `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                        position: 'relative',
+                            position: 'relative',
                             overflow: 'hidden'
                         }}
                     >
@@ -449,7 +480,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                 direction="row"
                                 spacing={2}
                                 sx={{
-                            position: 'absolute',
+                                    position: 'absolute',
                                     bottom: 16,
                                     left: '50%',
                                     transform: 'translateX(-50%)',
@@ -523,16 +554,16 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                     </Typography>
                                 </Box>
                             </Zoom>
-                        </Box>
-                    </Paper>
-                </Fade>
+                                                </Box>
+                                        </Paper>
+                                    </Fade>
             ) : null}
 
             {showResult && scannedEmployee && (
                 <Zoom in>
-                    <Paper
+                                        <Paper 
                         elevation={0}
-                                    sx={{
+                                            sx={{ 
                             p: 3,
                             mt: 2,
                             borderRadius: 4,
@@ -562,65 +593,65 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({
                                     {workingHours.is_late && (
                                         <Typography component="span" color="error" sx={{ ml: 1 }}>
                                             (Late)
-                                        </Typography>
+                                                    </Typography>
                                     )}
-                                </Typography>
+                                                    </Typography>
                                 {workingHours.check_out && (
                                     <>
                                         <Typography color="textSecondary">
                                             Check-out: {format(new Date(workingHours.check_out), 'hh:mm a')}
-                                        </Typography>
+                                                    </Typography>
                                         <Typography color="textSecondary">
                                             Total Hours: {workingHours.total_hours?.toFixed(2)}
-                                        </Typography>
+                                                    </Typography>
                                     </>
                                 )}
                             </>
                         )}
 
-                        <Button
+                                <Button
                             variant="outlined"
                             startIcon={<CameraIcon />}
-                            onClick={handleReset}
+                                    onClick={handleReset}
                             sx={{ mt: 2 }}
-                            fullWidth
-                        >
-                            Scan Another QR Code
-                        </Button>
+                                    fullWidth
+                                >
+                                    Scan Another QR Code
+                                </Button>
                     </Paper>
                 </Zoom>
             )}
 
-                            {error && (
+            {error && (
                 <Zoom in>
-                                    <Alert 
-                                        severity="error"
-                                        sx={{ 
+                    <Alert 
+                        severity="error"
+                        sx={{ 
                             mt: 2,
-                                            borderRadius: 2,
+                            borderRadius: 2,
                             animation: 'slideIn 0.3s ease-out',
                             '@keyframes slideIn': {
                                 from: { transform: 'translateY(-20px)', opacity: 0 },
                                 to: { transform: 'translateY(0)', opacity: 1 }
                             }
-                                        }}
-                                        action={
-                                            <Button 
+                        }}
+                        action={
+                            <Button 
                                 color="inherit"
-                                                size="small" 
+                                size="small" 
                                 onClick={() => {
                                     setError(null);
                                     handleReset();
                                 }}
                             >
                                 Retry
-                                            </Button>
-                                        }
-                                    >
-                                        {error}
-                                    </Alert>
-                                </Zoom>
-                            )}
+                            </Button>
+                        }
+                    >
+                        {error}
+                    </Alert>
+                </Zoom>
+            )}
             {renderCameraControls()}
         </Box>
     );
