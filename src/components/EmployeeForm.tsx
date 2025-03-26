@@ -16,32 +16,13 @@ import {
     SelectChangeEvent,
 } from '@mui/material';
 import { supabase } from '../config/supabase';
-import type { Employee, EmployeeFormData } from '../types/employee';
+import type { Employee, EmployeeFormData, Department } from '../types/employee';
 import { useNavigate } from 'react-router-dom';
 import { alpha, useTheme } from '@mui/material/styles';
 
 interface EmployeeFormProps {
     employee_id?: string; // If provided, we're in edit mode
 }
-
-const departmentOptions = [
-    'dt_activity',
-    'kitchen',
-    'food_and_beverage',
-    'butchery',
-    'operations',
-    'maintenance',
-    'reservations',
-    'housekeeping',
-    'pastry',
-    'stores',
-    'purchasing',
-    'accounts',
-    'it',
-    'transport',
-    'security',
-    'human_resources'
-] as const;
 
 const POSITIONS = [
     'Manager',
@@ -60,7 +41,7 @@ const initialFormData: EmployeeFormData = {
     first_name: '',
     last_name: '',
     email: '',
-    department: '',
+    department_id: '',
     position: '',
 };
 
@@ -74,6 +55,7 @@ const formatDepartmentName = (dept: string) => {
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
     const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -81,25 +63,44 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
     const theme = useTheme();
 
     useEffect(() => {
+        fetchDepartments();
         if (employee_id) {
             fetchEmployee();
         }
     }, [employee_id]);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('*')
+                .order('name');
+
+            if (error) throw error;
+
+            if (data) {
+                setDepartments(data);
+            }
+        } catch (err: any) {
+            console.error('Error fetching departments:', err);
+            setError('Failed to load departments');
+        }
+    };
 
     const fetchEmployee = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('employees')
-                .select('*')
+                .select('*, department:departments(*)')
                 .eq('employee_id', employee_id)
                 .single();
 
             if (error) throw error;
 
             if (data) {
-                const { first_name, last_name, email, department, position } = data;
-                setFormData({ first_name, last_name, email, department, position });
+                const { first_name, last_name, email, department_id, position } = data;
+                setFormData({ first_name, last_name, email, department_id, position });
             }
         } catch (err: any) {
             setError(err.message);
@@ -356,8 +357,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
                                 <FormControl fullWidth required>
                                     <InputLabel>Department</InputLabel>
                                     <Select
-                                        name="department"
-                                        value={formData.department}
+                                        name="department_id"
+                                        value={formData.department_id}
                                         label="Department"
                                         onChange={handleChange}
                                         sx={{
@@ -370,9 +371,9 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
                                             }
                                         }}
                                     >
-                                        {departmentOptions.map((dept) => (
-                                            <MenuItem key={dept} value={dept}>
-                                                {formatDepartmentName(dept)}
+                                        {departments.map((dept) => (
+                                            <MenuItem key={dept.id} value={dept.id}>
+                                                {dept.name}
                                             </MenuItem>
                                         ))}
                                     </Select>
