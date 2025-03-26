@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode.react';
-import { TextField, Button, Box, Card, CardContent, Typography, Snackbar, Alert } from '@mui/material';
+import { TextField, Button, Box, Card, CardContent, Typography, Snackbar, Alert, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import { supabase } from '../config/supabase';
-import type { Employee, EmployeeFormData } from '../types/employee';
+import type { Employee, EmployeeFormData, Department } from '../types/employee';
+import { SelectChangeEvent } from '@mui/material/Select';
 
 const QRCodeGenerator: React.FC = () => {
     const [employee, setEmployee] = useState<EmployeeFormData>({
         first_name: '',
         last_name: '',
         email: '',
-        department: '',
+        department_id: '',
         position: '',
     });
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [generatedId, setGeneratedId] = useState<string | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+    useEffect(() => {
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('*')
+                .order('name');
+
+            if (error) throw error;
+            setDepartments(data || []);
+        } catch (err: any) {
+            console.error('Error fetching departments:', err);
+            setErrors(prev => ({ ...prev, department: 'Failed to load departments' }));
+        }
+    };
 
     const validateForm = () => {
         const newErrors: Record<string, string> = {};
@@ -25,7 +46,7 @@ const QRCodeGenerator: React.FC = () => {
         } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(employee.email)) {
             newErrors.email = 'Invalid email address';
         }
-        if (!employee.department) newErrors.department = 'Department is required';
+        if (!employee.department_id) newErrors.department = 'Department is required';
         if (!employee.position) newErrors.position = 'Position is required';
 
         setErrors(newErrors);
@@ -58,12 +79,19 @@ const QRCodeGenerator: React.FC = () => {
         }
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleTextInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setEmployee(prev => ({ ...prev, [name]: value }));
-        // Clear error when user starts typing
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: '' }));
+        }
+    };
+
+    const handleDepartmentChange = (e: SelectChangeEvent<string>) => {
+        const { value } = e.target;
+        setEmployee(prev => ({ ...prev, department_id: value }));
+        if (errors.department) {
+            setErrors(prev => ({ ...prev, department: '' }));
         }
     };
 
@@ -83,7 +111,7 @@ const QRCodeGenerator: React.FC = () => {
                             name="first_name"
                             label="First Name"
                             value={employee.first_name}
-                            onChange={handleInputChange}
+                            onChange={handleTextInputChange}
                             error={!!errors.first_name}
                             helperText={errors.first_name}
                             required
@@ -92,7 +120,7 @@ const QRCodeGenerator: React.FC = () => {
                             name="last_name"
                             label="Last Name"
                             value={employee.last_name}
-                            onChange={handleInputChange}
+                            onChange={handleTextInputChange}
                             error={!!errors.last_name}
                             helperText={errors.last_name}
                             required
@@ -102,25 +130,32 @@ const QRCodeGenerator: React.FC = () => {
                             label="Email"
                             type="email"
                             value={employee.email}
-                            onChange={handleInputChange}
+                            onChange={handleTextInputChange}
                             error={!!errors.email}
                             helperText={errors.email}
                             required
                         />
-                        <TextField
-                            name="department"
-                            label="Department"
-                            value={employee.department}
-                            onChange={handleInputChange}
-                            error={!!errors.department}
-                            helperText={errors.department}
-                            required
-                        />
+                        <FormControl fullWidth required sx={{ m: 1 }}>
+                            <InputLabel>Department</InputLabel>
+                            <Select
+                                name="department_id"
+                                value={employee.department_id}
+                                label="Department"
+                                onChange={handleDepartmentChange}
+                                error={!!errors.department}
+                            >
+                                {departments.map((dept) => (
+                                    <MenuItem key={dept.id} value={dept.id}>
+                                        {dept.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                         <TextField
                             name="position"
                             label="Position"
                             value={employee.position}
-                            onChange={handleInputChange}
+                            onChange={handleTextInputChange}
                             error={!!errors.position}
                             helperText={errors.position}
                             required

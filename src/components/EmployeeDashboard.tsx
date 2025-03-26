@@ -28,7 +28,7 @@ import {
     QrCode as QrCodeIcon,
 } from '@mui/icons-material';
 import { supabase } from '../config/supabase';
-import type { Employee } from '../types/employee';
+import type { Employee, Department } from '../types/employee';
 import QRCode from 'qrcode';
 
 const EmployeeDashboard: React.FC = () => {
@@ -37,25 +37,39 @@ const EmployeeDashboard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [department, setDepartment] = useState('all');
-    const [departments, setDepartments] = useState<string[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
 
     useEffect(() => {
         fetchEmployees();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('*')
+                .order('name');
+
+            if (error) throw error;
+            setDepartments(data || []);
+        } catch (err: any) {
+            console.error('Error fetching departments:', err);
+        }
+    };
 
     const fetchEmployees = async () => {
         try {
             const { data, error } = await supabase
                 .from('employees')
-                .select('*')
+                .select(`
+                    *,
+                    department:departments(*)
+                `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-
             setEmployees(data || []);
-            // Extract unique departments
-            const uniqueDepartments = [...new Set(data?.map(emp => emp.department) || [])];
-            setDepartments(uniqueDepartments);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -91,7 +105,7 @@ const EmployeeDashboard: React.FC = () => {
             employee.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
-        const matchesDepartment = department === 'all' || employee.department === department;
+        const matchesDepartment = department === 'all' || employee.department?.id === department;
 
         return matchesSearch && matchesDepartment;
     });
@@ -146,7 +160,7 @@ const EmployeeDashboard: React.FC = () => {
                             >
                                 <MenuItem value="all">All Departments</MenuItem>
                                 {departments.map((dept) => (
-                                    <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                                    <MenuItem key={dept.id} value={dept.id}>{dept.name}</MenuItem>
                                 ))}
                             </Select>
                         </FormControl>
@@ -171,7 +185,7 @@ const EmployeeDashboard: React.FC = () => {
                                             {employee.first_name} {employee.last_name}
                                         </TableCell>
                                         <TableCell>{employee.email}</TableCell>
-                                        <TableCell>{employee.department}</TableCell>
+                                        <TableCell>{employee.department?.name || 'N/A'}</TableCell>
                                         <TableCell>{employee.position}</TableCell>
                                         <TableCell>{employee.employee_id}</TableCell>
                                         <TableCell align="center">
