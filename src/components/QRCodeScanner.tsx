@@ -269,19 +269,19 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                             facingMode={facingMode}
                             delay={1000}
                             style={{ 
-                                width: '100%',
+                                                width: '100%', 
                                 transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
                                 transition: 'transform 0.3s ease'
-                            }}
-                        />
-                        <Box
-                            sx={{
-                                position: 'absolute',
+                                            }}
+                                        />
+                                        <Box
+                                            sx={{
+                                                position: 'absolute',
                                 top: 16,
                                 left: 16,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1,
                                 background: 'rgba(0, 0, 0, 0.6)',
                                 color: 'white',
                                 padding: '8px 12px',
@@ -305,12 +305,12 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                         }}
                     >
                         <Tooltip title={`Switch to ${facingMode === 'environment' ? 'Front' : 'Back'} Camera`}>
-                            <IconButton
+                    <IconButton 
                                 onClick={handleSwitchCamera}
                                 disabled={isFlipping}
-                                sx={{
+                        sx={{
                                     background: theme => alpha(theme.palette.primary.main, 0.1),
-                                    '&:hover': {
+                            '&:hover': {
                                         background: theme => alpha(theme.palette.primary.main, 0.2),
                                         transform: 'scale(1.05)'
                                     },
@@ -325,11 +325,11 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                 ) : (
                                     <FlipCameraIcon />
                                 )}
-                            </IconButton>
+                    </IconButton>
                         </Tooltip>
-                        <Typography
+                                    <Typography 
                             variant="body2"
-                            sx={{
+                                        sx={{
                                 color: theme => alpha(theme.palette.text.primary, 0.7),
                                 textAlign: 'center'
                             }}
@@ -347,7 +347,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                     {cameraError && (
                         <Alert 
                             severity="error" 
-                            sx={{ 
+                                            sx={{ 
                                 mt: 2,
                                 borderRadius: 2,
                                 animation: 'slideIn 0.3s ease-out',
@@ -384,9 +384,9 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
             )}
 
             {showResult && scannedEmployee && (
-                <Paper
+                                        <Paper 
                     elevation={0}
-                    sx={{ 
+                                            sx={{ 
                         p: 3, 
                         mt: 2,
                         borderRadius: 4,
@@ -415,14 +415,14 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onResult, onError, onScan
                                 {workingHours.is_late && (
                                     <Typography component="span" color="error" sx={{ ml: 1 }}>
                                         (Late)
-                                    </Typography>
+                                                    </Typography>
                                 )}
-                            </Typography>
+                                                    </Typography>
                             {workingHours.check_out && (
                                 <>
                                     <Typography color="textSecondary">
                                         Check-out: {format(new Date(workingHours.check_out), 'hh:mm a')}
-                                    </Typography>
+                                                    </Typography>
                                     <Typography color="textSecondary">
                                         Total Hours: {workingHours.total_hours?.toFixed(2)}
                                                     </Typography>

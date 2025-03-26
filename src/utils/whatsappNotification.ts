@@ -63,7 +63,8 @@ export enum MessageStatus {
 // Message Types
 export enum MessageType {
     SMS = 'sms',
-    WHATSAPP = 'whatsapp'
+    WHATSAPP = 'whatsapp',
+    ATTENDANCE = "ATTENDANCE"
 }
 
 // Notification Parameters
