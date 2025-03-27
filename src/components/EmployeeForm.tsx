@@ -73,13 +73,17 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
         try {
             const { data, error } = await supabase
                 .from('departments')
-                .select('*')
+                .select('id, name')
                 .order('name');
 
             if (error) throw error;
 
             if (data) {
-                setDepartments(data);
+                setDepartments(data.map(dept => ({
+                    id: dept.id.toString(),
+                    code: dept.name.toLowerCase().replace(/\s+/g, '_'),
+                    name: dept.name
+                })));
             }
         } catch (err: any) {
             console.error('Error fetching departments:', err);
@@ -92,7 +96,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('employees')
-                .select('*, department:departments(*)')
+                .select('*, departments(id, name)')
                 .eq('employee_id', employee_id)
                 .single();
 
@@ -100,7 +104,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
 
             if (data) {
                 const { first_name, last_name, email, department_id, position } = data;
-                setFormData({ first_name, last_name, email, department_id, position });
+                setFormData({ first_name, last_name, email, department_id: department_id.toString(), position });
             }
         } catch (err: any) {
             setError(err.message);
