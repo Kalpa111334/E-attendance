@@ -73,15 +73,20 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ employee_id }) => {
         try {
             const { data, error } = await supabase
                 .from('departments')
-                .select('id, name')
+                .select('*')
                 .order('name');
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase error:', error);
+                throw error;
+            }
+
+            console.log('Departments data:', data);
 
             if (data) {
                 setDepartments(data.map(dept => ({
                     id: dept.id.toString(),
-                    code: dept.name.toLowerCase().replace(/\s+/g, '_'),
+                    code: dept.code,
                     name: dept.name
                 })));
             }
